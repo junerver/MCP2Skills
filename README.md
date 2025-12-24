@@ -2,6 +2,8 @@
 
 🚀 Convert any MCP server into a Claude Skill with 90% context savings.
 
+English | [简体中文](./README.zh-CN.md)
+
 ## Why This Exists
 
 MCP servers load all tool definitions into context at startup. With 20+ tools, that's 30-50k tokens consumed before Claude does any work.
@@ -184,6 +186,21 @@ cp -r ./skills/github ~/.claude/skills/
 
 ### Batch Converting Multiple Servers
 
+Use `batch_convert.py` to convert multiple MCP servers at once:
+
+```bash
+# 1. Prepare mcpservers.json with all your MCP servers
+# 2. Run batch conversion
+python batch_convert.py
+
+# This automatically:
+# - Splits mcpservers.json into servers/ directory
+# - Batch converts to skills/ directory
+# - Generates one Skill per MCP server
+```
+
+Or manually convert multiple configs:
+
 ```bash
 # Convert all configs in a directory
 for config in configs/*.json; do
@@ -228,6 +245,18 @@ python executor.py --describe tool_name
 python executor.py --call '{"tool": "tool_name", "arguments": {"param": "value"}}'
 ```
 
+### Windows Encoding Issues
+
+If you encounter encoding errors on Windows, the executor has built-in UTF-8 fixes:
+
+```bash
+# Use forward slashes in paths to avoid issues:
+python C:/Users/YourUser/.claude/skills/your-skill/executor.py --list
+
+# Or use the Python interpreter directly:
+python ~/.claude/skills/your-skill/executor.py --list
+```
+
 ## Limitations & Status
 
 - **Early stage** - actively seeking feedback
@@ -245,7 +274,7 @@ Contributions welcome! Areas of interest:
 - Documentation improvements
 - Performance optimizations
 
-Open an issue or submit a PR at [github.com/YJGGZHK/MCP2Skills](https://github.com/YJGGZHK/MCP2Skills)
+Open an issue or submit a PR at [github.com/junerver/MCP2Skills](https://github.com/junerver/MCP2Skills)
 
 ## Credits
 
