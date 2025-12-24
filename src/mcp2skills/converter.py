@@ -200,6 +200,11 @@ class BatchConverter:
             console.print("[yellow]No mcpServers found in config[/yellow]")
             return 0
 
+        # Clean up servers directory before splitting
+        if self.settings.servers_dir.exists():
+            for old_file in self.settings.servers_dir.glob("*.json"):
+                old_file.unlink()
+
         self.settings.servers_dir.mkdir(parents=True, exist_ok=True)
 
         count = 0
