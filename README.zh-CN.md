@@ -40,6 +40,80 @@ cp -r skills/my-service ~/.claude/skills/
 
 ✅ 完成！您的 MCP 服务器现在是一个上下文占用极小的 Claude Skill。
 
+## MCP 配置文件格式
+
+`mcpservers.json` 文件使用标准的 MCP 服务器配置格式，兼容以下工具：
+
+- **Roocode** - AI 编程助手
+- **Claude Code** - Anthropic 官方 CLI
+- **Kilocode** - AI 开发环境
+- 其他 MCP 兼容工具
+
+### 格式结构
+
+```json
+{
+  "mcpServers": {
+    "server-name": {
+      "command": "可执行文件路径",
+      "args": ["参数1", "参数2"],
+      "env": {
+        "环境变量": "值"
+      },
+      "disabled": false,
+      "type": "stdio"
+    }
+  }
+}
+```
+
+### 字段说明
+
+| 字段 | 类型 | 必需 | 说明 |
+|------|------|------|------|
+| `command` | string | ✅ | 可执行命令（node、npx、uvx 等） |
+| `args` | array | ✅ | 命令参数 |
+| `env` | object | ❌ | 环境变量（API 密钥、路径等） |
+| `disabled` | boolean | ❌ | 设为 `true` 可临时禁用服务器 |
+| `type` | string | ❌ | 传输类型（通常为 "stdio"） |
+
+### 示例：mcpservers.json
+
+```json
+{
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_你的token"
+      }
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/允许的路径"],
+      "type": "stdio"
+    },
+    "memory": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-memory"]
+    }
+  }
+}
+```
+
+### 查找配置文件
+
+不同工具将配置文件存储在不同位置：
+
+| 工具 | 配置文件位置 |
+|------|-------------|
+| Roocode | `~/.roocode/mcps.json` |
+| Claude Code | `~/.claude/mcp_config.json` |
+| Kilocode | `~/.kilocode/mcp_servers.json` |
+
+您可以直接复制这些文件作为 `mcpservers.json` 使用。
+
 ## 工作原理
 
 转换器创建优化的 Skill 结构：

@@ -40,6 +40,80 @@ cp -r skills/my-service ~/.claude/skills/
 
 ✅ Done! Your MCP server is now a Claude Skill with minimal context usage.
 
+## MCP Config File Format
+
+The `mcpservers.json` file uses the standard MCP server configuration format compatible with:
+
+- **Roocode** - AI coding assistant
+- **Claude Code** - Anthropic's official CLI
+- **Kilocode** - AI development environment
+- Other MCP-compatible tools
+
+### Format Structure
+
+```json
+{
+  "mcpServers": {
+    "server-name": {
+      "command": "path/to/executable",
+      "args": ["arg1", "arg2"],
+      "env": {
+        "ENV_VAR": "value"
+      },
+      "disabled": false,
+      "type": "stdio"
+    }
+  }
+}
+```
+
+### Fields
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `command` | string | ✅ | Executable command (node, npx, uvx, etc.) |
+| `args` | array | ✅ | Command arguments |
+| `env` | object | ❌ | Environment variables for API keys, paths, etc. |
+| `disabled` | boolean | ❌ | Set to `true` to temporarily disable a server |
+| `type` | string | ❌ | Transport type (usually "stdio") |
+
+### Example: mcpservers.json
+
+```json
+{
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_your_token_here"
+      }
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/allow"],
+      "type": "stdio"
+    },
+    "memory": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-memory"]
+    }
+  }
+}
+```
+
+### Finding Your Config File
+
+Different tools store this file in different locations:
+
+| Tool | Config Location |
+|------|-----------------|
+| Roocode | `~/.roocode/mcps.json` |
+| Claude Code | `~/.claude/mcp_config.json` |
+| Kilocode | `~/.kilocode/mcp_servers.json` |
+
+You can copy any of these files to use as your `mcpservers.json`.
+
 ## What It Does
 
 The converter creates an optimized Skill structure:
