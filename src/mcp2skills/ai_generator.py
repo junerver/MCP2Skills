@@ -203,7 +203,7 @@ Return ONLY the description text."""
             {"role": "user", "content": prompt},
         ]
 
-        result = self._call_llm(messages, max_tokens=100, temperature=0.3)
+        result = self._call_llm(messages, max_tokens=500, temperature=0.3)
         return result if result else original_desc
 
     def generate_parameter_description(self, param_name: str, param_schema: dict[str, Any], tool_name: str) -> str:
@@ -225,7 +225,7 @@ Requirements:
 Return ONLY the description text."""
 
         messages = [{"role": "user", "content": prompt}]
-        result = self._call_llm(messages, max_tokens=50, temperature=0.2)
+        result = self._call_llm(messages, max_tokens=500, temperature=0.2)
         return result if result else self._infer_param_description(param_name, param_schema)
 
     def generate_examples(self, server_name: str, tools: list[dict[str, Any]]) -> str:
