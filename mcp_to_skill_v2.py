@@ -33,11 +33,11 @@ class MCPSkillGenerator:
         """Generate the complete skill structure."""
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
-        print(f"🔧 Generating skill for: {self.server_name}")
+        print(f"[GEN] Generating skill for: {self.server_name}")
 
         # 1. Get tools from MCP server
         tools = await self._get_mcp_tools()
-        print(f"✓ Found {len(tools)} tools")
+        print(f"[OK] Found {len(tools)} tools")
 
         # 2. Generate SKILL.md
         self._generate_skill_md(tools)
@@ -51,7 +51,7 @@ class MCPSkillGenerator:
         # 5. Generate package.json
         self._generate_package_json()
 
-        print(f"\n✅ Skill generated at: {self.output_dir}")
+        print(f"\n[DONE] Skill generated at: {self.output_dir}")
 
     async def _get_mcp_tools(self) -> List[Dict[str, Any]]:
         """Connect to MCP server and introspect available tools."""
@@ -89,7 +89,7 @@ class MCPSkillGenerator:
                 ]
 
         except Exception as e:
-            print(f"⚠️  Failed to connect to MCP server: {e}")
+            print(f"[WARN] Failed to connect to MCP server: {e}")
             print("   Using fallback mode (empty tool list)")
             return []
 
@@ -284,7 +284,7 @@ If execution fails:
 
         skill_path = self.output_dir / "SKILL.md"
         skill_path.write_text(content, encoding='utf-8')
-        print(f"✓ Created: SKILL.md")
+        print(f"[OK] Created: SKILL.md")
 
     def _generate_executor(self):
         """Generate the executor script with proper error handling."""
@@ -464,14 +464,14 @@ if __name__ == "__main__":
         executor_path = self.output_dir / "executor.py"
         executor_path.write_text(executor_code)
         executor_path.chmod(0o755)
-        print(f"✓ Created: executor.py")
+        print(f"[OK] Created: executor.py")
 
     def _generate_config(self):
         """Save MCP server configuration."""
         config_path = self.output_dir / "mcp-config.json"
         with open(config_path, 'w') as f:
             json.dump(self.mcp_config, f, indent=2)
-        print(f"✓ Created: mcp-config.json")
+        print(f"[OK] Created: mcp-config.json")
 
     def _generate_package_json(self):
         """Generate package.json with dependencies."""
@@ -487,7 +487,7 @@ if __name__ == "__main__":
         package_path = self.output_dir / "package.json"
         with open(package_path, 'w') as f:
             json.dump(package, f, indent=2)
-        print(f"✓ Created: package.json")
+        print(f"[OK] Created: package.json")
 
 
 async def convert_mcp_to_skill(mcp_config_path: str, output_dir: str):
@@ -502,7 +502,7 @@ async def convert_mcp_to_skill(mcp_config_path: str, output_dir: str):
     await generator.generate()
 
     print("\n" + "="*60)
-    print("🎉 Skill generation complete!")
+    print("[SUCCESS] Skill generation complete!")
     print("="*60)
     print(f"\nNext steps:")
     print(f"1. cd {output_dir} && pip install mcp")
