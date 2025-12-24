@@ -97,7 +97,7 @@ class MCPToSkillConverter:
         self._generate_mcp_config(config, output_dir)
         self._generate_package_json(server_name, output_dir)
 
-        console.print(f"[green]✓ Created skill: {output_dir}[/green]")
+        console.print(f"[green]Created skill: {output_dir}[/green]")
         return output_dir
 
     def _enhance_tools(self, tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -214,7 +214,7 @@ class BatchConverter:
             with open(output_file, "w", encoding="utf-8") as f:
                 json.dump(server_config, f, indent=2, ensure_ascii=False)
 
-            console.print(f"  [green]✓[/green] {server_name}.json")
+            console.print(f"  [green]OK[/green] {server_name}.json")
             count += 1
 
         console.print(f"\n[green]Split {count} server configs to {self.settings.servers_dir}/[/green]")

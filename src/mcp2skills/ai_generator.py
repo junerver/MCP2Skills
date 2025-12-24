@@ -2,6 +2,7 @@
 """AI-powered skill generator using LLM."""
 
 import json
+import os
 from typing import Any, Optional
 
 from openai import OpenAI
@@ -11,40 +12,17 @@ from mcp2skills.config import Settings
 
 console = Console()
 
+# Debug mode from environment
+DEBUG = os.getenv("MCP2SKILLS_DEBUG", "").lower() in ("true", "1", "yes")
 
-SYSTEM_PROMPT = """You are an expert at creating Claude Skills following Anthropic's best practices.
 
-## Core Principles
+SYSTEM_PROMPT = """You are a technical writer helping create documentation for AI assistant skills.
 
-1. **Concise is Key**: The context window is a public good. Only add context Claude doesn't already have.
-2. **Progressive Disclosure**: Use three-level loading - metadata (~100 words), SKILL.md body (<5k words), bundled resources (as needed).
-3. **Set Appropriate Degrees of Freedom**: Match specificity to task fragility.
-
-## SKILL.md Structure
-
-Every SKILL.md must have:
-1. **YAML Frontmatter** (required):
-   - `name`: The skill name
-   - `description`: Primary triggering mechanism - include WHAT the skill does AND WHEN to use it
-
-2. **Markdown Body** (required):
-   - Clear, actionable instructions
-   - Use imperative/infinitive form
-   - Keep under 500 lines
-
-## What NOT to Include
-
-- README.md, INSTALLATION_GUIDE.md, CHANGELOG.md
-- Verbose explanations Claude already knows
-- "When to Use This Skill" sections in body (put in description)
-- Deeply nested references
-
-## Quality Standards
-
-- Description must be comprehensive for triggering
-- Examples should be real and actionable
-- Parameters should have clear descriptions (never "No description")
-- Group related tools logically
+Guidelines:
+- Write concise, clear descriptions
+- Focus on what tools do and when to use them
+- Use natural language
+- Keep descriptions under 100 words
 """
 
 
@@ -59,11 +37,61 @@ class AISkillGenerator:
             self.client = OpenAI(
                 api_key=settings.llm.api_key,
                 base_url=settings.llm.base_url,
+                default_headers={
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                },
             )
 
     def is_available(self) -> bool:
         """Check if AI generation is available."""
         return self.client is not None and self.settings.use_ai
+
+    def _debug_log(self, message: str, data: Any = None) -> None:
+        """Log debug information if DEBUG mode is enabled."""
+        if DEBUG:
+            console.print(f"[dim][DEBUG] {message}[/dim]")
+            if data:
+                console.print(f"[dim]{data}[/dim]")
+
+    def _call_llm(self, messages: list[dict], max_tokens: int = 200, temperature: float = None) -> Optional[str]:
+        """Make an LLM API call with error handling and debug logging."""
+        if not self.client:
+            return None
+
+        if temperature is None:
+            temperature = self.settings.llm.temperature
+
+        self._debug_log(f"LLM Request to {self.settings.llm.base_url}")
+        self._debug_log(f"Model: {self.settings.llm.model}, Temperature: {temperature}, Max tokens: {max_tokens}")
+        self._debug_log("Messages:", json.dumps(messages, indent=2, ensure_ascii=False)[:500] + "...")
+
+        try:
+            response = self.client.chat.completions.create(
+                model=self.settings.llm.model,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
+            result = response.choices[0].message.content.strip()
+            self._debug_log(f"LLM Response: {result[:200]}...")
+            return result
+        except Exception as e:
+            error_msg = str(e)
+            error_type = type(e).__name__
+            self._debug_log(f"LLM Error Type: {error_type}")
+            self._debug_log(f"LLM Error: {error_msg}")
+
+            # Try to get more details from the exception
+            if hasattr(e, 'response'):
+                try:
+                    resp = e.response
+                    self._debug_log(f"Response Status: {resp.status_code}")
+                    self._debug_log(f"Response Body: {resp.text[:500]}")
+                except Exception:
+                    pass
+
+            console.print(f"[yellow]AI generation failed: {error_msg}, using fallback[/yellow]")
+            return None
 
     def generate_description(self, server_name: str, tools: list[dict[str, Any]]) -> str:
         """Generate an optimized skill description."""
@@ -72,7 +100,7 @@ class AISkillGenerator:
 
         tool_summary = self._summarize_tools(tools)
 
-        prompt = f"""Generate a concise, effective skill description for a Claude Skill.
+        prompt = f"""Generate a concise, effective skill description.
 
 Server Name: {server_name}
 Tools Available ({len(tools)}):
@@ -87,20 +115,13 @@ Requirements:
 
 Return ONLY the description text, no quotes or formatting."""
 
-        try:
-            response = self.client.chat.completions.create(
-                model=self.settings.llm.model,
-                messages=[
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": prompt},
-                ],
-                temperature=self.settings.llm.temperature,
-                max_tokens=200,
-            )
-            return response.choices[0].message.content.strip()
-        except Exception as e:
-            console.print(f"[yellow]AI generation failed: {e}, using fallback[/yellow]")
-            return self._fallback_description(server_name, tools)
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": prompt},
+        ]
+
+        result = self._call_llm(messages, max_tokens=200)
+        return result if result else self._fallback_description(server_name, tools)
 
     def enhance_tool_description(self, tool: dict[str, Any]) -> str:
         """Enhance a tool's description using AI."""
@@ -114,7 +135,7 @@ Return ONLY the description text, no quotes or formatting."""
         if original_desc and len(original_desc) > 50:
             return original_desc
 
-        prompt = f"""Improve this MCP tool description for a Claude Skill.
+        prompt = f"""Improve this MCP tool description.
 
 Tool Name: {name}
 Original Description: {original_desc or "(none)"}
@@ -127,19 +148,13 @@ Requirements:
 
 Return ONLY the description text."""
 
-        try:
-            response = self.client.chat.completions.create(
-                model=self.settings.llm.model,
-                messages=[
-                    {"role": "system", "content": "You are a technical writer creating tool documentation."},
-                    {"role": "user", "content": prompt},
-                ],
-                temperature=0.3,
-                max_tokens=100,
-            )
-            return response.choices[0].message.content.strip()
-        except Exception:
-            return original_desc
+        messages = [
+            {"role": "system", "content": "You are a technical writer creating tool documentation."},
+            {"role": "user", "content": prompt},
+        ]
+
+        result = self._call_llm(messages, max_tokens=100, temperature=0.3)
+        return result if result else original_desc
 
     def generate_parameter_description(self, param_name: str, param_schema: dict[str, Any], tool_name: str) -> str:
         """Generate a description for a parameter that lacks one."""
@@ -159,18 +174,9 @@ Requirements:
 
 Return ONLY the description text."""
 
-        try:
-            response = self.client.chat.completions.create(
-                model=self.settings.llm.model,
-                messages=[
-                    {"role": "user", "content": prompt},
-                ],
-                temperature=0.2,
-                max_tokens=50,
-            )
-            return response.choices[0].message.content.strip()
-        except Exception:
-            return self._infer_param_description(param_name, param_schema)
+        messages = [{"role": "user", "content": prompt}]
+        result = self._call_llm(messages, max_tokens=50, temperature=0.2)
+        return result if result else self._infer_param_description(param_name, param_schema)
 
     def generate_examples(self, server_name: str, tools: list[dict[str, Any]]) -> str:
         """Generate realistic usage examples."""
@@ -184,7 +190,7 @@ Return ONLY the description text."""
             for t in sample_tools
         ])
 
-        prompt = f"""Generate 2-3 realistic bash examples for this Claude Skill.
+        prompt = f"""Generate 2-3 realistic bash examples for this skill.
 
 Server: {server_name}
 Sample Tools:
@@ -198,19 +204,13 @@ Requirements:
 
 Format as a markdown code block with bash syntax."""
 
-        try:
-            response = self.client.chat.completions.create(
-                model=self.settings.llm.model,
-                messages=[
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": prompt},
-                ],
-                temperature=0.5,
-                max_tokens=500,
-            )
-            return response.choices[0].message.content.strip()
-        except Exception:
-            return self._fallback_examples(server_name, tools)
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": prompt},
+        ]
+
+        result = self._call_llm(messages, max_tokens=500, temperature=0.5)
+        return result if result else self._fallback_examples(server_name, tools)
 
     def _summarize_tools(self, tools: list[dict[str, Any]]) -> str:
         """Create a summary of tools for the prompt."""

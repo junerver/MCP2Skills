@@ -34,7 +34,25 @@ def load_config() -> dict:
         sys.exit(1)
 
     with open(config_path, "r", encoding="utf-8") as f:
-        return json.load(f)
+        config = json.load(f)
+
+    # Fix command path for cross-platform compatibility
+    command = config.get("command", "")
+    if sys.platform != "win32" and command.endswith(".cmd"):
+        # On Unix, try to use the command without .cmd extension
+        base_cmd = Path(command).stem
+        if base_cmd in ("npx", "node", "npm"):
+            config["command"] = base_cmd
+    elif sys.platform == "win32" and not command.endswith((".cmd", ".exe", ".bat")):
+        # On Windows, check if we need to add .cmd
+        if command in ("npx", "node", "npm"):
+            # Try to find the actual path
+            import shutil
+            found = shutil.which(command)
+            if found:
+                config["command"] = found
+
+    return config
 
 
 async def get_tools(config: dict) -> list:

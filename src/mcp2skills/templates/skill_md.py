@@ -33,7 +33,7 @@ description: {description}
 
 ### Execution
 
-Use the executor to interact with tools:
+Use the executor to interact with tools. The executor automatically handles cross-platform compatibility.
 
 ```bash
 # List all available tools
@@ -45,6 +45,8 @@ python executor.py --describe <tool_name>
 # Execute a tool
 python executor.py --call '{{"tool": "<tool_name>", "arguments": {{...}}}}'
 ```
+
+**Note**: On Windows, run from the skill directory or use the full path with forward slashes.
 
 ### Error Handling
 

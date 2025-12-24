@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """CLI interface for MCP2Skills."""
 
+import sys
+import io
 from pathlib import Path
 from typing import Optional
 
@@ -11,6 +13,11 @@ from rich.panel import Panel
 from mcp2skills import __version__
 from mcp2skills.config import Settings
 from mcp2skills.converter import MCPToSkillConverter, BatchConverter
+
+# Fix Windows console encoding
+if sys.platform == "win32":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
 app = typer.Typer(
     name="mcp2skills",
