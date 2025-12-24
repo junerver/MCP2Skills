@@ -96,7 +96,7 @@ LLM_API_KEY=your-api-key-here
 LLM_BASE_URL=https://api.openai.com/v1
 LLM_MODEL=gpt-4o-mini
 LLM_TEMPERATURE=0.7
-LLM_MAX_TOKENS=4096
+LLM_MAX_TOKENS=60000
 
 # 路径
 MCP_CONFIG_FILE=mcpservers.json
@@ -199,10 +199,10 @@ mcp2skills init [-o .env.example]
 
 ## 上下文节省
 
-| 模式 | 空闲 | 激活 | 节省 |
-|------|------|------|------|
-| MCP (20 工具) | ~30k tokens | ~30k tokens | - |
-| Skills | ~100 tokens | ~5k tokens | 83-99% |
+| 模式          | 空闲        | 激活        | 节省   |
+| ------------- | ----------- | ----------- | ------ |
+| MCP (20 工具) | ~30k tokens | ~30k tokens | -      |
+| Skills        | ~100 tokens | ~5k tokens  | 83-99% |
 
 ## 项目结构
 

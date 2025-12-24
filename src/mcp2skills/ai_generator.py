@@ -16,39 +16,44 @@ console = Console()
 DEBUG = os.getenv("MCP2SKILLS_DEBUG", "").lower() in ("true", "1", "yes")
 
 
-SYSTEM_PROMPT = """You are an expert at creating AI assistant skills following best practices.
+SYSTEM_PROMPT = """You are an expert at creating AI assistant skills following Anthropic's best practices.
 
 ## Core Principles
 
-1. **Concise is Key**: The context window is a public good. Only add context the AI doesn't already have.
-2. **Progressive Disclosure**: Use three-level loading - metadata (~100 words), SKILL.md body (<5k words), bundled resources (as needed).
-3. **Set Appropriate Degrees of Freedom**: Match specificity to task fragility.
+### Concise is Key
+The context window is a public good. Skills share the context window with everything else the AI needs.
 
-## SKILL.md Structure
+**Default assumption: The AI is already very smart.** Only add context it doesn't already have. Challenge each piece of information: "Does the AI really need this explanation?" Prefer concise examples over verbose explanations.
 
-Every SKILL.md must have:
-1. **YAML Frontmatter** (required):
-   - `name`: The skill name
-   - `description`: Primary triggering mechanism - include WHAT the skill does AND WHEN to use it
+### Description is the Primary Trigger
+The `description` field is the ONLY thing the AI reads to decide when to use a skill. It must be:
+- Comprehensive enough to trigger correctly
+- Include WHAT the skill does AND WHEN to use it
+- All "when to use" information goes here, NOT in the body
 
-2. **Markdown Body** (required):
-   - Clear, actionable instructions
-   - Use imperative/infinitive form
-   - Keep under 500 lines
+**Good description example:**
+"Comprehensive document creation, editing, and analysis with support for tracked changes, comments, formatting preservation, and text extraction. Use when working with professional documents (.docx files) for: (1) Creating new documents, (2) Modifying or editing content, (3) Working with tracked changes, (4) Adding comments, or any other document tasks"
 
-## What NOT to Include
-
-- README.md, INSTALLATION_GUIDE.md, CHANGELOG.md
-- Verbose explanations the AI already knows
-- "When to Use This Skill" sections in body (put in description)
-- Deeply nested references
+### Progressive Disclosure
+- **Metadata (name + description)**: Always in context (~100 words)
+- **SKILL.md body**: Only loaded when skill triggers (<5k words)
+- **Bundled resources**: Loaded as needed
 
 ## Quality Standards
 
-- Description must be comprehensive for triggering
-- Examples should be real and actionable
-- Parameters should have clear descriptions (never "No description")
-- Group related tools logically
+1. Description must be 50-100 words, comprehensive for triggering
+2. Include specific trigger conditions and use cases
+3. Parameters should have clear descriptions (never "No description")
+4. Examples should use real tool names and realistic parameters
+5. Use imperative/infinitive form in instructions
+6. Group related tools logically by function
+
+## What NOT to Include
+
+- Verbose explanations the AI already knows
+- "When to Use This Skill" sections in body (put in description)
+- README.md, INSTALLATION_GUIDE.md, CHANGELOG.md
+- Deeply nested references
 """
 
 
@@ -99,7 +104,11 @@ class AISkillGenerator:
                 max_tokens=max_tokens,
             )
             result = response.choices[0].message.content.strip()
-            self._debug_log(f"LLM Response: {result[:200]}...")
+            finish_reason = response.choices[0].finish_reason
+            self._debug_log(f"LLM Response (full): {result}")
+            self._debug_log(f"Finish reason: {finish_reason}")
+            if finish_reason == "length":
+                console.print(f"[yellow]Warning: AI response was truncated (max_tokens={max_tokens})[/yellow]")
             return result
         except Exception as e:
             error_msg = str(e)
@@ -126,28 +135,43 @@ class AISkillGenerator:
 
         tool_summary = self._summarize_tools(tools)
 
-        prompt = f"""Generate a concise, effective skill description.
+        prompt = f"""Generate a skill description following Anthropic's best practices.
 
 Server Name: {server_name}
 Tools Available ({len(tools)}):
 {tool_summary}
 
-Requirements:
-1. Description must explain WHAT the skill does
-2. Description must explain WHEN to use it (trigger conditions)
-3. Keep it under 100 words
-4. Use natural language, not bullet points
-5. Include key use cases and keywords for triggering
+## CRITICAL LENGTH REQUIREMENT ##
+Your response MUST be between 50-100 words. Count your words before responding.
+Responses under 50 words will be REJECTED and replaced with a fallback.
 
-Return ONLY the description text, no quotes or formatting."""
+## Content Requirements ##
+1. Start with what the skill does (capabilities)
+2. List 3-5 specific use cases with numbered format: (1), (2), (3)
+3. Include relevant keywords for triggering
+4. Mention file types or domains if applicable
+
+## Example (75 words) ##
+"context7 provides 2 tools for accessing up-to-date software library documentation. Use when you need to: (1) resolve a package or library name to find its documentation ID, (2) fetch current API references and code examples for any library, (3) get conceptual guides and architectural information, (4) look up specific topics like hooks, routing, or authentication. Keywords: documentation, library, package, API, reference, docs."
+
+## Your Response ##
+Write a description of 50-100 words for {server_name}. Do not include quotes around your response."""
 
         messages = [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": prompt},
         ]
 
-        result = self._call_llm(messages, max_tokens=200)
-        return result if result else self._fallback_description(server_name, tools)
+        result = self._call_llm(messages, max_tokens=self.settings.llm.max_tokens)
+
+        # Validate length - description should be 50-100 words
+        if result:
+            word_count = len(result.split())
+            if word_count < 30:  # Too short, use fallback
+                self._debug_log(f"AI description too short ({word_count} words), using fallback")
+                return self._fallback_description(server_name, tools)
+            return result
+        return self._fallback_description(server_name, tools)
 
     def enhance_tool_description(self, tool: dict[str, Any]) -> str:
         """Enhance a tool's description using AI."""
@@ -225,17 +249,23 @@ Sample Tools:
 Requirements:
 1. Use actual tool names from the list
 2. Include realistic parameter values
-3. Show the executor.py --call format
+3. Use the EXACT format: python executor.py --call '{{"tool": "<tool_name>", "arguments": {{...}}}}'
 4. Add brief comments explaining each example
 
-Format as a markdown code block with bash syntax."""
+Example format:
+```bash
+# Comment explaining what this does
+python executor.py --call '{{"tool": "resolve-library-id", "arguments": {{"libraryName": "react"}}}}'
+```
+
+Return ONLY the markdown code block with bash syntax."""
 
         messages = [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": prompt},
         ]
 
-        result = self._call_llm(messages, max_tokens=500, temperature=0.5)
+        result = self._call_llm(messages, max_tokens=self.settings.llm.max_tokens, temperature=0.5)
         return result if result else self._fallback_examples(server_name, tools)
 
     def _summarize_tools(self, tools: list[dict[str, Any]]) -> str:
@@ -251,17 +281,29 @@ Format as a markdown code block with bash syntax."""
 
     def _fallback_description(self, server_name: str, tools: list[dict[str, Any]]) -> str:
         """Generate description without AI."""
-        tool_names = [t.get("name", "") for t in tools[:5]]
-        use_cases = ", ".join(tool_names[:3]) if tool_names else "various operations"
-        keywords = " ".join(set(
-            word for name in tool_names
-            for word in name.replace("_", " ").split()
-        ))[:50]
+        tool_names = [t.get("name", "") for t in tools[:8]]
+
+        # Extract use cases from tool names
+        use_cases = []
+        for name in tool_names[:5]:
+            # Convert tool name to readable use case
+            readable = name.replace("_", " ").replace("-", " ")
+            use_cases.append(readable)
+
+        # Extract keywords from all tool names
+        keywords = set()
+        for name in tool_names:
+            for word in name.replace("_", " ").replace("-", " ").split():
+                if len(word) > 2:  # Skip short words
+                    keywords.add(word.lower())
+
+        keywords_str = ", ".join(sorted(keywords)[:8])
+        use_cases_str = ", ".join(use_cases[:5]) if use_cases else "various operations"
 
         return (
             f"{server_name} provides {len(tools)} tools. "
-            f"Use cases: {use_cases}. "
-            f"Keywords: {keywords}."
+            f"Use cases: {use_cases_str}. "
+            f"Keywords: {keywords_str}."
         )
 
     def _fallback_examples(self, server_name: str, tools: list[dict[str, Any]]) -> str:

@@ -15,10 +15,14 @@ def generate_skill_md(
     # Generate tool documentation
     tool_docs = _generate_tool_docs(tools)
 
+    # Clean description - remove newlines and extra spaces for YAML compatibility
+    clean_description = " ".join(description.split())
+
     # Build the SKILL.md content
     content = f"""---
 name: {server_name}
-description: {description}
+description: >-
+  {clean_description}
 ---
 
 # {server_name}

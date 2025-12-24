@@ -78,6 +78,9 @@ class MCPToSkillConverter:
         # Determine output directory
         if output_dir is None:
             output_dir = self.settings.output_dir / skill_name
+        else:
+            # If output_dir is provided, create skill subdirectory within it
+            output_dir = output_dir / skill_name
         output_dir.mkdir(parents=True, exist_ok=True)
 
         console.print(f"[blue]Converting {server_name}...[/blue]")
