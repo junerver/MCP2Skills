@@ -1,0 +1,7 @@
+nul
+
+# Sensitive configuration files
+mcpservers.json
+
+# Generated skills directory
+skills/

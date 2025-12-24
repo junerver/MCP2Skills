@@ -173,6 +173,9 @@ python executor.py --describe <tool_name>
 
 # Execute a tool
 python executor.py --call '{"tool": "example", "arguments": {}}'
+
+# On Windows with full path (use forward slashes)
+python C:/Users/YourUser/.claude/skills/<skill-name>/executor.py --list
 ```"""
 
     def _format_tool_with_params(self, tool: Dict[str, Any]) -> str:
@@ -258,6 +261,10 @@ description: {description}
 2. **Get tool parameters** (optional) - If unsure about parameter format:
 
    ```bash
+   # Windows (use forward slashes or Python directly)
+   python ~/.claude/skills/{self.server_name}/executor.py --describe <tool_name>
+
+   # Unix/macOS
    cd ~/.claude/skills/{self.server_name}
    python executor.py --describe <tool_name>
    ```
@@ -265,9 +272,15 @@ description: {description}
 3. **Execute the tool call**:
 
    ```bash
+   # Windows (recommended: use Python directly with forward slashes)
+   python ~/.claude/skills/{self.server_name}/executor.py --call '{{"tool": "<tool_name>", "arguments": {{...}}}}'
+
+   # Unix/macOS
    cd ~/.claude/skills/{self.server_name}
    python executor.py --call '{{"tool": "<tool_name>", "arguments": {{...}}}}'
    ```
+
+   **Note for Windows:** Use forward slashes (`/`) in paths when executing from bash, or use the Python interpreter directly with the full path.
 
 ### Error Handling
 
@@ -276,6 +289,7 @@ If execution fails:
 - Check tool name is correct
 - Use `--describe` to view required parameters
 - Ensure MCP server is accessible
+- On Windows, try using forward slashes in paths (e.g., `C:/Users/...` instead of `C:\Users\...`)
 
 ## Examples
 
@@ -290,13 +304,22 @@ If execution fails:
         """Generate the executor script with proper error handling."""
 
         executor_code = '''#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """MCP Skill Executor - Dynamic tool invocation"""
 
 import json
 import sys
 import asyncio
 import argparse
+import io
+import os
 from pathlib import Path
+
+# Fix Windows console encoding issues
+if sys.platform == 'win32':
+    # Set stdout to UTF-8 mode
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 try:
     from mcp import ClientSession, StdioServerParameters
@@ -429,22 +452,21 @@ async def main():
             )
 
             # Format output
+            def safe_output(obj):
+                """Safely output data, handling encoding issues."""
+                try:
+                    if hasattr(obj, 'text'):
+                        return obj.text
+                    data = obj.__dict__ if hasattr(obj, '__dict__') else obj
+                    return json.dumps(data, indent=2, ensure_ascii=False)
+                except Exception:
+                    return str(obj)
+
             if isinstance(result, list):
                 for item in result:
-                    if hasattr(item, 'text'):
-                        print(item.text)
-                    else:
-                        print(json.dumps(
-                            item.__dict__ if hasattr(item, '__dict__') else item,
-                            indent=2,
-                            ensure_ascii=False
-                        ))
+                    print(safe_output(item))
             else:
-                print(json.dumps(
-                    result.__dict__ if hasattr(result, '__dict__') else result,
-                    indent=2,
-                    ensure_ascii=False
-                ))
+                print(safe_output(result))
         else:
             parser.print_help()
 
