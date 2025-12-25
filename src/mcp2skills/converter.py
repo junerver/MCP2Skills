@@ -4,6 +4,7 @@
 import asyncio
 import json
 import sys
+import hashlib
 from pathlib import Path
 from typing import Any, Optional
 
@@ -12,9 +13,23 @@ from rich.console import Console
 from mcp2skills.config import Settings
 from mcp2skills.ai_generator import AISkillGenerator
 from mcp2skills.templates.executor import EXECUTOR_TEMPLATE
+from mcp2skills.templates.daemon_executor import DAEMON_EXECUTOR_TEMPLATE
+from mcp2skills.templates.daemon_service import DAEMON_SERVICE_TEMPLATE
 from mcp2skills.templates.skill_md import generate_skill_md
 
 console = Console()
+
+# Port range for daemon services (avoid common ports)
+DAEMON_PORT_BASE = 19900
+DAEMON_PORT_MAX = 19999
+
+
+def generate_daemon_port(server_name: str) -> int:
+    """Generate a unique port number for daemon service based on server name."""
+    # Use hash to generate consistent port for same server name
+    hash_value = int(hashlib.md5(server_name.encode()).hexdigest()[:8], 16)
+    port = DAEMON_PORT_BASE + (hash_value % (DAEMON_PORT_MAX - DAEMON_PORT_BASE))
+    return port
 
 
 class MCPToSkillConverter:
@@ -23,6 +38,10 @@ class MCPToSkillConverter:
     def __init__(self, settings: Optional[Settings] = None):
         self.settings = settings or Settings.from_env()
         self.ai_generator = AISkillGenerator(self.settings)
+
+    def is_daemon_mode(self, config: dict[str, Any]) -> bool:
+        """Check if the MCP server should run in daemon mode."""
+        return config.get("daemon", False) is True
 
     async def introspect_mcp_server(self, config: dict[str, Any]) -> list[dict[str, Any]]:
         """Connect to MCP server and discover available tools."""
@@ -74,6 +93,7 @@ class MCPToSkillConverter:
 
         server_name = config.get("name", config_path.stem)
         skill_name = f"{self.settings.skill_prefix}{server_name}"
+        is_daemon = self.is_daemon_mode(config)
 
         # Determine output directory
         if output_dir is None:
@@ -83,7 +103,8 @@ class MCPToSkillConverter:
             output_dir = output_dir / skill_name
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        console.print(f"[blue]Converting {server_name}...[/blue]")
+        mode_str = "[daemon]" if is_daemon else "[standard]"
+        console.print(f"[blue]Converting {server_name} {mode_str}...[/blue]")
 
         # Introspect MCP server
         tools = asyncio.run(self.introspect_mcp_server(config))
@@ -94,11 +115,19 @@ class MCPToSkillConverter:
             console.print("  [green]Using AI to enhance descriptions...[/green]")
             tools = self._enhance_tools(tools)
 
-        # Generate skill files
-        self._generate_skill_md(server_name, tools, output_dir)
-        self._generate_executor(output_dir)
+        # Generate skill files based on mode
+        self._generate_skill_md(server_name, tools, output_dir, is_daemon)
+        
+        if is_daemon:
+            daemon_port = generate_daemon_port(server_name)
+            console.print(f"  [cyan]Daemon mode enabled (port: {daemon_port})[/cyan]")
+            self._generate_daemon_executor(output_dir, daemon_port)
+            self._generate_daemon_service(output_dir, daemon_port)
+        else:
+            self._generate_executor(output_dir)
+        
         self._generate_mcp_config(config, output_dir)
-        self._generate_package_json(server_name, output_dir)
+        self._generate_package_json(server_name, output_dir, is_daemon)
 
         console.print(f"[green]Created skill: {output_dir}[/green]")
         return output_dir
@@ -128,6 +157,7 @@ class MCPToSkillConverter:
         server_name: str,
         tools: list[dict[str, Any]],
         output_dir: Path,
+        is_daemon: bool = False,
     ) -> None:
         """Generate SKILL.md file."""
         # Generate description
@@ -147,15 +177,28 @@ class MCPToSkillConverter:
             description=description,
             tools=tools,
             examples=examples,
+            is_daemon=is_daemon,
         )
 
         skill_path = output_dir / "SKILL.md"
         skill_path.write_text(content, encoding="utf-8")
 
     def _generate_executor(self, output_dir: Path) -> None:
-        """Generate executor.py file."""
+        """Generate standard executor.py file."""
         executor_path = output_dir / "executor.py"
         executor_path.write_text(EXECUTOR_TEMPLATE, encoding="utf-8")
+
+    def _generate_daemon_executor(self, output_dir: Path, daemon_port: int) -> None:
+        """Generate daemon mode executor.py file."""
+        executor_content = DAEMON_EXECUTOR_TEMPLATE.replace("{daemon_port}", str(daemon_port))
+        executor_path = output_dir / "executor.py"
+        executor_path.write_text(executor_content, encoding="utf-8")
+
+    def _generate_daemon_service(self, output_dir: Path, daemon_port: int) -> None:
+        """Generate mcp_daemon.py service file."""
+        daemon_content = DAEMON_SERVICE_TEMPLATE.replace("{daemon_port}", str(daemon_port))
+        daemon_path = output_dir / "mcp_daemon.py"
+        daemon_path.write_text(daemon_content, encoding="utf-8")
 
     def _generate_mcp_config(self, config: dict[str, Any], output_dir: Path) -> None:
         """Generate mcp-config.json file."""
@@ -163,16 +206,22 @@ class MCPToSkillConverter:
         with open(config_path, "w", encoding="utf-8") as f:
             json.dump(config, f, indent=2, ensure_ascii=False)
 
-    def _generate_package_json(self, server_name: str, output_dir: Path) -> None:
+    def _generate_package_json(self, server_name: str, output_dir: Path, is_daemon: bool = False) -> None:
         """Generate package.json file."""
         package = {
             "name": f"skill-{server_name}",
             "version": "1.0.0",
             "description": f"Claude Skill for {server_name} MCP server",
+            "mode": "daemon" if is_daemon else "standard",
             "dependencies": {
                 "mcp": ">=1.0.0"
             }
         }
+        
+        # Add aiohttp dependency for daemon mode
+        if is_daemon:
+            package["dependencies"]["aiohttp"] = ">=3.8.0"
+        
         package_path = output_dir / "package.json"
         with open(package_path, "w", encoding="utf-8") as f:
             json.dump(package, f, indent=2, ensure_ascii=False)

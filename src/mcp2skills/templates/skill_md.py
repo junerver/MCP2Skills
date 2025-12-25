@@ -9,6 +9,7 @@ def generate_skill_md(
     description: str,
     tools: list[dict[str, Any]],
     examples: str,
+    is_daemon: bool = False,
 ) -> str:
     """Generate SKILL.md content following Anthropic best practices."""
 
@@ -17,6 +18,12 @@ def generate_skill_md(
 
     # Clean description - remove newlines and extra spaces for YAML compatibility
     clean_description = " ".join(description.split())
+
+    # Generate execution instructions based on mode
+    if is_daemon:
+        execution_section = _generate_daemon_execution_section()
+    else:
+        execution_section = _generate_standard_execution_section()
 
     # Build the SKILL.md content
     content = f"""---
@@ -27,7 +34,7 @@ description: >-
 
 # {server_name}
 
-{_generate_intro(server_name, tools)}
+{_generate_intro(server_name, tools, is_daemon)}
 
 ## Available Tools ({len(tools)})
 
@@ -35,7 +42,19 @@ description: >-
 
 ## Instructions
 
-### Execution
+{execution_section}
+
+## Examples
+
+{examples}
+"""
+
+    return content
+
+
+def _generate_standard_execution_section() -> str:
+    """Generate execution section for standard mode."""
+    return """### Execution
 
 Use the executor to interact with tools. The executor automatically handles cross-platform compatibility.
 
@@ -47,7 +66,7 @@ python executor.py --list
 python executor.py --describe <tool_name>
 
 # Execute a tool
-python executor.py --call '{{"tool": "<tool_name>", "arguments": {{...}}}}'
+python executor.py --call '{"tool": "<tool_name>", "arguments": {...}}'
 ```
 
 **Note**: On Windows, run from the skill directory or use the full path with forward slashes.
@@ -57,22 +76,57 @@ python executor.py --call '{{"tool": "<tool_name>", "arguments": {{...}}}}'
 If execution fails:
 1. Verify tool name with `--list`
 2. Check parameter format with `--describe <tool_name>`
-3. Ensure MCP server dependencies are installed
-
-## Examples
-
-{examples}
-"""
-
-    return content
+3. Ensure MCP server dependencies are installed"""
 
 
-def _generate_intro(server_name: str, tools: list[dict[str, Any]]) -> str:
+def _generate_daemon_execution_section() -> str:
+    """Generate execution section for daemon mode."""
+    return """### Execution (Daemon Mode)
+
+This skill uses a persistent daemon for faster tool execution. The daemon maintains a long-lived connection to the MCP server, eliminating connection overhead between calls.
+
+```bash
+# List all available tools (auto-starts daemon if needed)
+python executor.py --list
+
+# Get detailed info about a specific tool
+python executor.py --describe <tool_name>
+
+# Execute a tool
+python executor.py --call '{"tool": "<tool_name>", "arguments": {...}}'
+
+# Check daemon status
+python executor.py --status
+
+# Manually start/stop daemon
+python executor.py --start
+python executor.py --stop
+```
+
+### Daemon Management
+
+- The daemon starts automatically on first tool call
+- It runs in the background and persists across multiple calls
+- Use `--status` to check if daemon is running
+- Use `--stop` to gracefully shutdown the daemon
+
+### Error Handling
+
+If execution fails:
+1. Check daemon status with `--status`
+2. Verify tool name with `--list`
+3. Check parameter format with `--describe <tool_name>`
+4. If daemon is unresponsive, stop and restart: `--stop` then retry
+5. Check `daemon.log` for detailed error messages"""
+
+
+def _generate_intro(server_name: str, tools: list[dict[str, Any]], is_daemon: bool = False) -> str:
     """Generate a brief introduction."""
     tool_count = len(tools)
+    mode_note = " (daemon mode - persistent connection)" if is_daemon else ""
     if tool_count == 1:
-        return f"MCP server providing 1 tool for {server_name} operations."
-    return f"MCP server providing {tool_count} tools for {server_name} operations."
+        return f"MCP server providing 1 tool for {server_name} operations{mode_note}."
+    return f"MCP server providing {tool_count} tools for {server_name} operations{mode_note}."
 
 
 def _generate_tool_docs(tools: list[dict[str, Any]]) -> str:

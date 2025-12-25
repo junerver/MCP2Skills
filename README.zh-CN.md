@@ -9,6 +9,7 @@
 - **AI 增强生成**：使用 LLM 生成高质量的描述、示例和文档
 - **Anthropic 最佳实践**：遵循官方技能设计指南，实现渐进式披露
 - **90% 上下文节省**：启动时 token 使用从 ~30k 降至 ~100
+- **守护进程模式支持**：为需要长时间会话的工具提供持久连接（如浏览器自动化）
 - **批量转换**：一次转换多个 MCP 服务器
 - **OpenAI 兼容**：支持任何 OpenAI 兼容 API（OpenAI、Azure、本地模型）
 
@@ -128,6 +129,52 @@ LLM_BASE_URL=https://api.deepseek.com/v1
 LLM_MODEL=deepseek-chat
 ```
 
+## 守护进程模式
+
+对于需要持久连接的 MCP 服务器（如 chrome-devtools 等浏览器自动化工具），可以在服务器配置中添加 `"daemon": true` 来启用守护进程模式：
+
+```json
+{
+  "mcpServers": {
+    "chrome-devtools": {
+      "command": "npx",
+      "args": ["chrome-devtools-mcp@latest"],
+      "daemon": true  // 启用守护进程模式
+    }
+  }
+}
+```
+
+启用守护进程模式后，MCP2Skills 会生成：
+
+- **`mcp_daemon.py`** - 维护持久 MCP 连接的 HTTP 守护进程服务
+- **`executor.py`** - 具有自动生命周期管理的守护进程感知执行器
+
+### 守护进程模式的优势
+
+| 方面 | 标准模式 | 守护进程模式 |
+|------|----------|--------------|
+| 连接方式 | 每次调用新建 (~2-5秒) | 持久连接 (<100ms) |
+| 内存占用 | 按需 | 常驻进程 |
+| 适用场景 | 简单工具 | 有状态操作 |
+| 状态保持 | 调用间丢失 | 跨调用保留 |
+
+### 守护进程管理
+
+```bash
+# 检查守护进程状态
+python executor.py --status
+
+# 手动启动守护进程
+python executor.py --start
+
+# 停止守护进程
+python executor.py --stop
+
+# 调用工具（需要时自动启动守护进程）
+python executor.py --call '{"tool": "take_snapshot", "arguments": {}}'
+```
+
 ## MCP 配置文件格式
 
 `mcpservers.json` 文件使用标准的 MCP 服务器配置格式，兼容：
@@ -192,6 +239,7 @@ mcp2skills init [-o .env.example]
 │ 生成的 Skill                     │
 │ ├── SKILL.md (~100 tokens)      │
 │ ├── executor.py                 │
+│ ├── mcp_daemon.py (守护进程模式) │
 │ ├── mcp-config.json             │
 │ └── package.json                │
 └─────────────────────────────────┘
@@ -215,8 +263,10 @@ MCP2Skills/
 │   ├── converter.py        # 核心转换逻辑
 │   ├── ai_generator.py     # AI 增强
 │   └── templates/
-│       ├── executor.py     # 执行器模板
-│       └── skill_md.py     # SKILL.md 生成器
+│       ├── executor.py         # 标准执行器模板
+│       ├── daemon_executor.py  # 守护进程感知执行器
+│       ├── daemon_service.py   # 守护进程服务模板
+│       └── skill_md.py         # SKILL.md 生成器
 ├── pyproject.toml          # 项目配置
 ├── .env.example            # 示例配置
 └── README.md

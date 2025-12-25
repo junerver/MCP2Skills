@@ -9,6 +9,7 @@ English | [简体中文](./README.zh-CN.md)
 - **AI-Enhanced Generation**: Uses LLM to generate high-quality descriptions, examples, and documentation
 - **Anthropic Best Practices**: Follows official skill design guidelines for progressive disclosure
 - **90% Context Savings**: Reduces token usage from ~30k to ~100 tokens at startup
+- **Daemon Mode Support**: Persistent connections for tools requiring long-lived sessions (e.g., browser automation)
 - **Batch Conversion**: Convert multiple MCP servers at once
 - **OpenAI-Compatible**: Works with any OpenAI-compatible API (OpenAI, Azure, local models)
 
@@ -128,6 +129,52 @@ LLM_BASE_URL=https://api.deepseek.com/v1
 LLM_MODEL=deepseek-chat
 ```
 
+## Daemon Mode
+
+For MCP servers that require persistent connections (e.g., browser automation tools like chrome-devtools), you can enable daemon mode by adding `"daemon": true` to the server configuration:
+
+```json
+{
+  "mcpServers": {
+    "chrome-devtools": {
+      "command": "npx",
+      "args": ["chrome-devtools-mcp@latest"],
+      "daemon": true  // Enable daemon mode
+    }
+  }
+}
+```
+
+When daemon mode is enabled, MCP2Skills generates:
+
+- **`mcp_daemon.py`** - HTTP daemon service that maintains a persistent MCP connection
+- **`executor.py`** - Daemon-aware executor with automatic lifecycle management
+
+### Benefits of Daemon Mode
+
+| Aspect | Standard Mode | Daemon Mode |
+|--------|---------------|-------------|
+| Connection | New per call (~2-5s) | Persistent (<100ms) |
+| Memory | On-demand | Resident process |
+| Best For | Simple tools | Stateful operations |
+| State | Lost between calls | Preserved across calls |
+
+### Daemon Management
+
+```bash
+# Check daemon status
+python executor.py --status
+
+# Manually start daemon
+python executor.py --start
+
+# Stop daemon
+python executor.py --stop
+
+# Call tools (auto-starts daemon if needed)
+python executor.py --call '{"tool": "take_snapshot", "arguments": {}}'
+```
+
 ## MCP Config File Format
 
 The `mcpservers.json` file uses the standard MCP server configuration format compatible with:
@@ -192,6 +239,7 @@ mcp2skills init [-o .env.example]
 │ Generated Skill                 │
 │ ├── SKILL.md (~100 tokens)      │
 │ ├── executor.py                 │
+│ ├── mcp_daemon.py (if daemon)   │
 │ ├── mcp-config.json             │
 │ └── package.json                │
 └─────────────────────────────────┘
@@ -215,8 +263,10 @@ MCP2Skills/
 │   ├── converter.py        # Core conversion logic
 │   ├── ai_generator.py     # AI-powered enhancements
 │   └── templates/
-│       ├── executor.py     # Executor template
-│       └── skill_md.py     # SKILL.md generator
+│       ├── executor.py         # Standard executor template
+│       ├── daemon_executor.py  # Daemon-aware executor
+│       ├── daemon_service.py   # Daemon service template
+│       └── skill_md.py         # SKILL.md generator
 ├── pyproject.toml          # Project configuration
 ├── .env.example            # Example configuration
 └── README.md
