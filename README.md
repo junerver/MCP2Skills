@@ -342,9 +342,10 @@ Contributions welcome! Areas of interest:
 
 ## Credits
 
-Inspired by:
+Based on and inspired by:
 
-- [mcp-to-skill-converter](https://github.com/GBSOSS/-mcp-to-skill-converter) - Original converter
+- [MCP2Skills](https://github.com/YJGGZHK/MCP2Skills) - Original codebase and project foundation
+- [mcp-to-skill-converter](https://github.com/GBSOSS/-mcp-to-skill-converter) - Initial converter concept
 - [playwright-skill](https://github.com/lackeyjb/playwright-skill) - Progressive disclosure pattern
 - [Anthropic Skills](https://github.com/anthropics/skills) - Official skill guidelines
 

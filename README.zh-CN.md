@@ -342,9 +342,10 @@ uv run ruff check src/
 
 ## 致谢
 
-灵感来源：
+基于并受启发于：
 
-- [mcp-to-skill-converter](https://github.com/GBSOSS/-mcp-to-skill-converter) - 原始转换器
+- [MCP2Skills](https://github.com/YJGGZHK/MCP2Skills) - 原始代码库和项目基础
+- [mcp-to-skill-converter](https://github.com/GBSOSS/-mcp-to-skill-converter) - 初始转换器概念
 - [playwright-skill](https://github.com/lackeyjb/playwright-skill) - 渐进式披露模式
 - [Anthropic Skills](https://github.com/anthropics/skills) - 官方技能指南
 
