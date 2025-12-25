@@ -9,6 +9,7 @@ English | [简体中文](./README.zh-CN.md)
 - **AI-Enhanced Generation**: Uses LLM to generate high-quality descriptions, examples, and documentation
 - **Anthropic Best Practices**: Follows official skill design guidelines for progressive disclosure
 - **90% Context Savings**: Reduces token usage from ~30k to ~100 tokens at startup
+- **Compact Mode**: Automatically optimizes SKILL.md for tools >10, reducing file size by 60%
 - **Daemon Mode Support**: Persistent connections for tools requiring long-lived sessions (e.g., browser automation)
 - **Batch Conversion**: Convert multiple MCP servers at once
 - **OpenAI-Compatible**: Works with any OpenAI-compatible API (OpenAI, Azure, local models)
@@ -202,6 +203,46 @@ The `mcpservers.json` file uses the standard MCP server configuration format com
 }
 ```
 
+## Compact Mode (Progressive Disclosure)
+
+For skills with many tools (>10), MCP2Skills automatically enables **compact mode** following Anthropic's progressive disclosure principle:
+
+### What is Compact Mode?
+
+- **SKILL.md**: Contains only tool names and brief descriptions (~60% smaller)
+- **references/tools.md**: Complete parameter documentation for all tools
+- **Auto-detection**: Enabled when tool count > 10
+
+### Benefits
+
+| Metric | Before | After | Improvement |
+|--------|--------|-------|-------------|
+| SKILL.md size | ~11KB | ~4.4KB | **-60%** |
+| SKILL.md lines | 288 | 118 | **-59%** |
+| Context usage | ~3.7k tokens | ~1.5k tokens | **-59%** |
+
+### Usage
+
+```bash
+# Auto-detect (enabled for >10 tools)
+mcp2skills convert servers/github.json
+
+# Force enable compact mode
+mcp2skills convert servers/github.json --compact
+
+# Batch conversion with compact mode
+mcp2skills batch --compact
+
+# Check tool parameters on demand
+python executor.py --describe <tool_name>
+```
+
+### Progressive Disclosure Levels
+
+1. **Metadata** (~100 tokens): Always in context - name + description
+2. **SKILL.md** (<5k tokens): Loaded when skill triggers - tool overview
+3. **references/tools.md**: Loaded on demand - detailed parameters
+
 ## CLI Commands
 
 ```bash
@@ -209,10 +250,10 @@ The `mcpservers.json` file uses the standard MCP server configuration format com
 mcp2skills --help
 
 # Convert single server
-mcp2skills convert <config.json> [-o output_dir] [--no-ai]
+mcp2skills convert <config.json> [-o output_dir] [--no-ai] [--compact]
 
 # Batch convert
-mcp2skills batch [-c mcpservers.json] [-o skills/] [--skip-split] [--no-ai]
+mcp2skills batch [-c mcpservers.json] [-o skills/] [--skip-split] [--no-ai] [--compact]
 
 # Generate .env template
 mcp2skills init [-o .env.example]
@@ -237,7 +278,9 @@ mcp2skills init [-o .env.example]
              ▼
 ┌─────────────────────────────────┐
 │ Generated Skill                 │
-│ ├── SKILL.md (~100 tokens)      │
+│ ├── SKILL.md (~100-1500 tokens) │
+│ ├── references/                 │
+│ │   └── tools.md (if compact)   │
 │ ├── executor.py                 │
 │ ├── mcp_daemon.py (if daemon)   │
 │ ├── mcp-config.json             │

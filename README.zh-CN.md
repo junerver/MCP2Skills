@@ -9,6 +9,7 @@
 - **AI 增强生成**：使用 LLM 生成高质量的描述、示例和文档
 - **Anthropic 最佳实践**：遵循官方技能设计指南，实现渐进式披露
 - **90% 上下文节省**：启动时 token 使用从 ~30k 降至 ~100
+- **紧凑模式**：自动优化超过 10 个工具的 SKILL.md，文件大小减少 60%
 - **守护进程模式支持**：为需要长时间会话的工具提供持久连接（如浏览器自动化）
 - **批量转换**：一次转换多个 MCP 服务器
 - **OpenAI 兼容**：支持任何 OpenAI 兼容 API（OpenAI、Azure、本地模型）
@@ -139,7 +140,7 @@ LLM_MODEL=deepseek-chat
     "chrome-devtools": {
       "command": "npx",
       "args": ["chrome-devtools-mcp@latest"],
-      "daemon": true  // 启用守护进程模式
+      "daemon": true // 启用守护进程模式
     }
   }
 }
@@ -152,12 +153,12 @@ LLM_MODEL=deepseek-chat
 
 ### 守护进程模式的优势
 
-| 方面 | 标准模式 | 守护进程模式 |
-|------|----------|--------------|
-| 连接方式 | 每次调用新建 (~2-5秒) | 持久连接 (<100ms) |
-| 内存占用 | 按需 | 常驻进程 |
-| 适用场景 | 简单工具 | 有状态操作 |
-| 状态保持 | 调用间丢失 | 跨调用保留 |
+| 方面     | 标准模式               | 守护进程模式      |
+| -------- | ---------------------- | ----------------- |
+| 连接方式 | 每次调用新建 (~2-5 秒) | 持久连接 (<100ms) |
+| 内存占用 | 按需                   | 常驻进程          |
+| 适用场景 | 简单工具               | 有状态操作        |
+| 状态保持 | 调用间丢失             | 跨调用保留        |
 
 ### 守护进程管理
 
@@ -202,6 +203,46 @@ python executor.py --call '{"tool": "take_snapshot", "arguments": {}}'
 }
 ```
 
+## 紧凑模式（渐进式披露）
+
+对于拥有大量工具（>10 个）的技能，MCP2Skills 会自动启用**紧凑模式**，遵循 Anthropic 的渐进式披露原则：
+
+### 什么是紧凑模式？
+
+- **SKILL.md**：仅包含工具名称和简短描述（体积减少约 60%）
+- **references/tools.md**：所有工具的完整参数文档
+- **自动检测**：工具数量 > 10 时自动启用
+
+### 优化效果
+
+| 指标          | 优化前       | 优化后       | 改进     |
+| ------------- | ------------ | ------------ | -------- |
+| SKILL.md 大小 | ~11KB        | ~4.4KB       | **-60%** |
+| SKILL.md 行数 | 288          | 118          | **-59%** |
+| 上下文占用    | ~3.7k tokens | ~1.5k tokens | **-59%** |
+
+### 使用方法
+
+```bash
+# 自动检测（>10 个工具时启用）
+mcp2skills convert servers/github.json
+
+# 强制启用紧凑模式
+mcp2skills convert servers/github.json --compact
+
+# 批量转换时使用紧凑模式
+mcp2skills batch --compact
+
+# 按需查看工具参数
+python executor.py --describe <tool_name>
+```
+
+### 渐进式披露层级
+
+1. **元数据**（~100 tokens）：始终在上下文中 - 名称 + 描述
+2. **SKILL.md**（<5k tokens）：技能触发时加载 - 工具概览
+3. **references/tools.md**：按需加载 - 详细参数
+
 ## CLI 命令
 
 ```bash
@@ -209,10 +250,10 @@ python executor.py --call '{"tool": "take_snapshot", "arguments": {}}'
 mcp2skills --help
 
 # 转换单个服务器
-mcp2skills convert <config.json> [-o output_dir] [--no-ai]
+mcp2skills convert <config.json> [-o output_dir] [--no-ai] [--compact]
 
 # 批量转换
-mcp2skills batch [-c mcpservers.json] [-o skills/] [--skip-split] [--no-ai]
+mcp2skills batch [-c mcpservers.json] [-o skills/] [--skip-split] [--no-ai] [--compact]
 
 # 生成 .env 模板
 mcp2skills init [-o .env.example]
@@ -237,7 +278,9 @@ mcp2skills init [-o .env.example]
              ▼
 ┌─────────────────────────────────┐
 │ 生成的 Skill                     │
-│ ├── SKILL.md (~100 tokens)      │
+│ ├── SKILL.md (~100-1500 tokens) │
+│ ├── references/                 │
+│ │   └── tools.md (紧凑模式)      │
 │ ├── executor.py                 │
 │ ├── mcp_daemon.py (守护进程模式) │
 │ ├── mcp-config.json             │

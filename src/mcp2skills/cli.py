@@ -59,6 +59,10 @@ def convert(
         False, "--no-ai",
         help="Disable AI-powered enhancements",
     ),
+    compact: Optional[bool] = typer.Option(
+        None, "--compact",
+        help="Use compact SKILL.md with separate references (auto-detected if >10 tools)",
+    ),
     env_file: Optional[Path] = typer.Option(
         None, "--env", "-e",
         help="Path to .env file for configuration",
@@ -75,7 +79,7 @@ def convert(
         settings.use_ai = False
 
     converter = MCPToSkillConverter(settings)
-    output_dir = converter.convert(config, output)
+    output_dir = converter.convert(config, output, compact_mode=compact)
 
     console.print(Panel(
         f"[green]Skill created successfully![/green]\n\n"
@@ -108,6 +112,10 @@ def batch(
         False, "--no-ai",
         help="Disable AI-powered enhancements",
     ),
+    compact: Optional[bool] = typer.Option(
+        None, "--compact",
+        help="Use compact SKILL.md with separate references (auto-detected if >10 tools)",
+    ),
     env_file: Optional[Path] = typer.Option(
         None, "--env", "-e",
         help="Path to .env file for configuration",
@@ -124,6 +132,7 @@ def batch(
         settings.output_dir = output_dir
 
     settings.use_ai = not no_ai
+    settings.compact_mode = compact  # Store compact mode preference
 
     if settings.use_ai and not settings.validate_llm_config():
         console.print(

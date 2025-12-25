@@ -10,11 +10,22 @@ def generate_skill_md(
     tools: list[dict[str, Any]],
     examples: str,
     is_daemon: bool = False,
+    compact_mode: bool = False,
 ) -> str:
-    """Generate SKILL.md content following Anthropic best practices."""
+    """Generate SKILL.md content following Anthropic best practices.
+    
+    Args:
+        server_name: The name of the MCP server
+        description: Server description for the frontmatter
+        tools: List of tool definitions with their schemas
+        examples: Example usage strings
+        is_daemon: Whether to use daemon mode execution instructions
+        compact_mode: If True, generates compact SKILL.md with separate references file
+                     following progressive disclosure principle (recommended for >10 tools)
+    """
 
     # Generate tool documentation
-    tool_docs = _generate_tool_docs(tools)
+    tool_docs = _generate_tool_docs(tools, compact=compact_mode)
 
     # Clean description - remove newlines and extra spaces for YAML compatibility
     clean_description = " ".join(description.split())
@@ -39,7 +50,7 @@ description: >-
 ## Available Tools ({len(tools)})
 
 {tool_docs}
-
+{_generate_reference_note(tools, compact_mode)}
 ## Instructions
 
 {execution_section}
@@ -129,8 +140,24 @@ def _generate_intro(server_name: str, tools: list[dict[str, Any]], is_daemon: bo
     return f"MCP server providing {tool_count} tools for {server_name} operations{mode_note}."
 
 
-def _generate_tool_docs(tools: list[dict[str, Any]]) -> str:
-    """Generate tool documentation with smart grouping."""
+def _generate_reference_note(tools: list[dict[str, Any]], compact: bool) -> str:
+    """Generate a note pointing to the references file if in compact mode."""
+    if not compact or len(tools) <= 5:
+        return ""
+    return """
+> **Note**: For detailed parameter documentation, run `python executor.py --describe <tool_name>`
+> or see `references/tools.md` for the complete API reference.
+
+"""
+
+
+def _generate_tool_docs(tools: list[dict[str, Any]], compact: bool = False) -> str:
+    """Generate tool documentation with smart grouping.
+    
+    Args:
+        tools: List of tool definitions
+        compact: If True, only show tool names and brief descriptions (no parameters)
+    """
     if not tools:
         return "(No tools available)"
 
@@ -144,7 +171,7 @@ def _generate_tool_docs(tools: list[dict[str, Any]]) -> str:
             lines.append("")
 
         for tool in group_tools:
-            lines.extend(_format_tool(tool))
+            lines.extend(_format_tool(tool, compact=compact))
             lines.append("")
 
     return "\n".join(lines).rstrip()
@@ -202,11 +229,25 @@ def _group_tools(tools: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]
     return sorted_groups
 
 
-def _format_tool(tool: dict[str, Any]) -> list[str]:
-    """Format a single tool's documentation."""
+def _format_tool(tool: dict[str, Any], compact: bool = False) -> list[str]:
+    """Format a single tool's documentation.
+    
+    Args:
+        tool: Tool definition dict
+        compact: If True, only show name and brief description (no parameters)
+    """
     lines = []
     name = tool.get("name", "unknown")
     description = tool.get("description", "")
+    
+    # Truncate long descriptions in compact mode
+    if compact and description:
+        # Keep only the first sentence or first 100 chars
+        first_sentence = description.split('. ')[0]
+        if len(first_sentence) > 100:
+            description = first_sentence[:97] + "..."
+        else:
+            description = first_sentence + ("." if not first_sentence.endswith(".") else "")
 
     # Tool header with description
     if description:
@@ -214,7 +255,11 @@ def _format_tool(tool: dict[str, Any]) -> list[str]:
     else:
         lines.append(f"- `{name}`")
 
-    # Parameters
+    # In compact mode, skip parameter details
+    if compact:
+        return lines
+
+    # Parameters (only in non-compact mode)
     schema = tool.get("inputSchema", {})
     properties = schema.get("properties", {})
     required = set(schema.get("required", []))
@@ -245,3 +290,73 @@ def _format_tool(tool: dict[str, Any]) -> list[str]:
                     lines.append(f"      - `{param_name}` ({param_type})")
 
     return lines
+
+
+def generate_tools_reference(
+    server_name: str,
+    tools: list[dict[str, Any]],
+) -> str:
+    """Generate a detailed tools reference file for the references/ directory.
+    
+    This file contains complete parameter documentation for all tools,
+    following the progressive disclosure principle.
+    """
+    lines = [
+        f"# {server_name} - Tools Reference",
+        "",
+        "Complete API documentation for all available tools.",
+        "",
+        "## Tools",
+        "",
+    ]
+    
+    for tool in tools:
+        name = tool.get("name", "unknown")
+        description = tool.get("description", "")
+        
+        lines.append(f"### `{name}`")
+        lines.append("")
+        if description:
+            lines.append(description)
+            lines.append("")
+        
+        schema = tool.get("inputSchema", {})
+        properties = schema.get("properties", {})
+        required = set(schema.get("required", []))
+        
+        if properties:
+            req_params = [(k, v) for k, v in properties.items() if k in required]
+            opt_params = [(k, v) for k, v in properties.items() if k not in required]
+            
+            if req_params:
+                lines.append("**Required Parameters:**")
+                lines.append("")
+                for param_name, param_schema in req_params:
+                    param_type = param_schema.get("type", "any")
+                    param_desc = param_schema.get("description", "")
+                    lines.append(f"- `{param_name}` ({param_type})")
+                    if param_desc:
+                        lines.append(f"  - {param_desc}")
+                lines.append("")
+            
+            if opt_params:
+                lines.append("**Optional Parameters:**")
+                lines.append("")
+                for param_name, param_schema in opt_params:
+                    param_type = param_schema.get("type", "any")
+                    param_desc = param_schema.get("description", "")
+                    default = param_schema.get("default")
+                    lines.append(f"- `{param_name}` ({param_type})")
+                    if param_desc:
+                        lines.append(f"  - {param_desc}")
+                    if default is not None:
+                        lines.append(f"  - Default: `{default}`")
+                lines.append("")
+        else:
+            lines.append("*No parameters required.*")
+            lines.append("")
+        
+        lines.append("---")
+        lines.append("")
+    
+    return "\n".join(lines)

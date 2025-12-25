@@ -63,6 +63,10 @@ class Settings(BaseModel):
         default="skill-",
         description="Prefix for generated skill directories"
     )
+    compact_mode: Optional[bool] = Field(
+        default=None,
+        description="Use compact SKILL.md with separate references. None=auto-detect based on tool count"
+    )
 
     @classmethod
     def from_env(cls, env_file: Optional[Path] = None) -> "Settings":

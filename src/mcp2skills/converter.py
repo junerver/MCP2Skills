@@ -15,13 +15,17 @@ from mcp2skills.ai_generator import AISkillGenerator
 from mcp2skills.templates.executor import EXECUTOR_TEMPLATE
 from mcp2skills.templates.daemon_executor import DAEMON_EXECUTOR_TEMPLATE
 from mcp2skills.templates.daemon_service import DAEMON_SERVICE_TEMPLATE
-from mcp2skills.templates.skill_md import generate_skill_md
+from mcp2skills.templates.skill_md import generate_skill_md, generate_tools_reference
 
 console = Console()
 
 # Port range for daemon services (avoid common ports)
 DAEMON_PORT_BASE = 19900
 DAEMON_PORT_MAX = 19999
+
+# Threshold for compact mode (following progressive disclosure principle)
+# When tool count exceeds this, use compact SKILL.md with separate references
+COMPACT_MODE_THRESHOLD = 10
 
 
 def generate_daemon_port(server_name: str) -> int:
@@ -85,8 +89,17 @@ class MCPToSkillConverter:
         self,
         config_path: Path,
         output_dir: Optional[Path] = None,
+        compact_mode: Optional[bool] = None,
     ) -> Path:
-        """Convert a single MCP config to a Claude Skill."""
+        """Convert a single MCP config to a Claude Skill.
+        
+        Args:
+            config_path: Path to the MCP server config file
+            output_dir: Optional output directory for the skill
+            compact_mode: If None, auto-detect based on tool count.
+                         If True, use compact mode with separate references.
+                         If False, include all details in SKILL.md.
+        """
         # Load config
         with open(config_path, "r", encoding="utf-8") as f:
             config = json.load(f)
@@ -116,7 +129,7 @@ class MCPToSkillConverter:
             tools = self._enhance_tools(tools)
 
         # Generate skill files based on mode
-        self._generate_skill_md(server_name, tools, output_dir, is_daemon)
+        self._generate_skill_md(server_name, tools, output_dir, is_daemon, compact_mode)
         
         if is_daemon:
             daemon_port = generate_daemon_port(server_name)
@@ -158,8 +171,26 @@ class MCPToSkillConverter:
         tools: list[dict[str, Any]],
         output_dir: Path,
         is_daemon: bool = False,
+        compact_mode: Optional[bool] = None,
     ) -> None:
-        """Generate SKILL.md file."""
+        """Generate SKILL.md file.
+        
+        Args:
+            server_name: Name of the MCP server
+            tools: List of tool definitions
+            output_dir: Output directory for the skill
+            is_daemon: Whether to use daemon mode
+            compact_mode: If None, auto-detect based on tool count.
+                         If True, use compact mode with separate references.
+                         If False, include all details in SKILL.md.
+        """
+        # Auto-detect compact mode based on tool count (progressive disclosure)
+        if compact_mode is None:
+            compact_mode = len(tools) > COMPACT_MODE_THRESHOLD
+        
+        if compact_mode:
+            console.print(f"  [cyan]Using compact mode ({len(tools)} tools > {COMPACT_MODE_THRESHOLD})[/cyan]")
+        
         # Generate description
         if self.ai_generator.is_available():
             description = self.ai_generator.generate_description(server_name, tools)
@@ -178,10 +209,31 @@ class MCPToSkillConverter:
             tools=tools,
             examples=examples,
             is_daemon=is_daemon,
+            compact_mode=compact_mode,
         )
 
         skill_path = output_dir / "SKILL.md"
         skill_path.write_text(content, encoding="utf-8")
+        
+        # Generate references/tools.md for compact mode
+        if compact_mode:
+            self._generate_tools_reference(server_name, tools, output_dir)
+    
+    def _generate_tools_reference(
+        self,
+        server_name: str,
+        tools: list[dict[str, Any]],
+        output_dir: Path,
+    ) -> None:
+        """Generate references/tools.md file with detailed tool documentation."""
+        references_dir = output_dir / "references"
+        references_dir.mkdir(parents=True, exist_ok=True)
+        
+        content = generate_tools_reference(server_name, tools)
+        
+        tools_ref_path = references_dir / "tools.md"
+        tools_ref_path.write_text(content, encoding="utf-8")
+        console.print(f"  [green]Created references/tools.md[/green]")
 
     def _generate_executor(self, output_dir: Path) -> None:
         """Generate standard executor.py file."""
@@ -278,7 +330,14 @@ class BatchConverter:
         return count
 
     def convert_all(self, skip_split: bool = False) -> list[Path]:
-        """Convert all MCP servers to Skills."""
+        """Convert all MCP servers to Skills.
+        
+        Args:
+            skip_split: Skip splitting mcpservers.json
+            
+        Returns:
+            List of output directories for created skills
+        """
         # Step 1: Split config if needed
         if not skip_split:
             self.split_mcp_config()
@@ -295,11 +354,14 @@ class BatchConverter:
 
         console.print(f"\n[blue]Converting {len(configs)} MCP servers...[/blue]\n")
 
+        # Get compact_mode from settings (can be None for auto-detect)
+        compact_mode = getattr(self.settings, 'compact_mode', None)
+
         # Step 3: Convert each server
         results = []
         for config_path in configs:
             try:
-                output_dir = self.converter.convert(config_path)
+                output_dir = self.converter.convert(config_path, compact_mode=compact_mode)
                 results.append(output_dir)
             except Exception as e:
                 console.print(f"[red]Failed to convert {config_path.name}: {e}[/red]")
