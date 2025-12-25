@@ -194,6 +194,11 @@ The `mcpservers.json` file uses the standard MCP server configuration format com
 - **Claude Code** - Anthropic's official CLI
 - **Kilocode** - AI development environment
 
+### Supported Transport Types
+
+MCP2Skills supports all three official MCP transport types:
+
+#### 1. stdio (Local Process)
 ```json
 {
   "mcpServers": {
@@ -202,16 +207,44 @@ The `mcpservers.json` file uses the standard MCP server configuration format com
       "args": ["-y", "@modelcontextprotocol/server-github"],
       "env": {
         "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_your_token"
-      }
-    },
-    "filesystem": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/allow"],
+      },
       "type": "stdio"
     }
   }
 }
 ```
+
+#### 2. SSE (Server-Sent Events)
+```json
+{
+  "mcpServers": {
+    "example-sse": {
+      "url": "https://api.example.com/sse",
+      "type": "sse",
+      "headers": {
+        "Authorization": "Bearer your-token"
+      }
+    }
+  }
+}
+```
+
+#### 3. streamable-http (Recommended for Production)
+```json
+{
+  "mcpServers": {
+    "web-reader": {
+      "url": "https://api.example.com/mcp",
+      "type": "streamable-http",
+      "headers": {
+        "X-API-Key": "your-api-key"
+      }
+    }
+  }
+}
+```
+
+**Note**: Requires MCP SDK >= 1.22.0 for streamable-http support
 
 ## Compact Mode (Progressive Disclosure)
 

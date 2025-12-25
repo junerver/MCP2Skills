@@ -51,39 +51,115 @@ class MCPToSkillConverter:
 
     async def introspect_mcp_server(self, config: dict[str, Any]) -> list[dict[str, Any]]:
         """Connect to MCP server and discover available tools."""
+        server_type = config.get("type", "stdio")
+        
         try:
-            from mcp import ClientSession, StdioServerParameters
-            from mcp.client.stdio import stdio_client
+            from mcp import ClientSession
         except ImportError:
             console.print("[red]Error: mcp package not installed. Run: pip install mcp[/red]")
             return []
 
-        command = config.get("command", "")
-        args = config.get("args", [])
-        env = config.get("env", {})
-
-        server_params = StdioServerParameters(
-            command=command,
-            args=args,
-            env=env,
-        )
-
         tools = []
-        try:
-            async with stdio_client(server_params) as (read, write):
-                async with ClientSession(read, write) as session:
-                    await session.initialize()
-                    result = await session.list_tools()
-                    tools = [
-                        {
-                            "name": tool.name,
-                            "description": tool.description or "",
-                            "inputSchema": tool.inputSchema if hasattr(tool, "inputSchema") else {},
-                        }
-                        for tool in result.tools
-                    ]
-        except Exception as e:
-            console.print(f"[yellow]Warning: Could not introspect MCP server: {e}[/yellow]")
+        
+        # Handle Streamable HTTP servers
+        if server_type == "streamable-http":
+            try:
+                import httpx
+                from mcp.client.streamable_http import streamable_http_client
+            except ImportError:
+                console.print("[red]Error: mcp or httpx not installed. Run: pip install mcp httpx[/red]")
+                return []
+            
+            url = config.get("url", "")
+            if not url:
+                console.print("[yellow]Warning: No URL specified for streamable-http server[/yellow]")
+                return []
+            
+            headers = config.get("headers", {})
+            
+            try:
+                # Create httpx client with custom headers
+                async with httpx.AsyncClient(headers=headers) as http_client:
+                    async with streamable_http_client(url, http_client=http_client) as (read, write, _):
+                        async with ClientSession(read, write) as session:
+                            await session.initialize()
+                            result = await session.list_tools()
+                            tools = [
+                                {
+                                    "name": tool.name,
+                                    "description": tool.description or "",
+                                    "inputSchema": tool.inputSchema if hasattr(tool, "inputSchema") else {},
+                                }
+                                for tool in result.tools
+                            ]
+            except Exception as e:
+                console.print(f"[yellow]Warning: Could not introspect streamable-http server: {e}[/yellow]")
+        
+        # Handle SSE servers
+        elif server_type in ("sse", "http"):
+            try:
+                from mcp.client.sse import sse_client
+            except ImportError:
+                console.print("[red]Error: mcp not installed. Run: pip install mcp[/red]")
+                return []
+            
+            url = config.get("url", "")
+            if not url:
+                console.print("[yellow]Warning: No URL specified for SSE server[/yellow]")
+                return []
+            
+            headers = config.get("headers", {})
+            
+            try:
+                async with sse_client(url, headers=headers) as (read, write):
+                    async with ClientSession(read, write) as session:
+                        await session.initialize()
+                        result = await session.list_tools()
+                        tools = [
+                            {
+                                "name": tool.name,
+                                "description": tool.description or "",
+                                "inputSchema": tool.inputSchema if hasattr(tool, "inputSchema") else {},
+                            }
+                            for tool in result.tools
+                        ]
+            except Exception as e:
+                console.print(f"[yellow]Warning: Could not introspect SSE server: {e}[/yellow]")
+        
+        # Handle stdio type servers
+        else:
+            try:
+                from mcp import StdioServerParameters
+                from mcp.client.stdio import stdio_client
+            except ImportError:
+                console.print("[red]Error: mcp package not installed. Run: pip install mcp[/red]")
+                return []
+
+            command = config.get("command", "")
+            args = config.get("args", [])
+            env = config.get("env", {})
+
+            server_params = StdioServerParameters(
+                command=command,
+                args=args,
+                env=env,
+            )
+
+            try:
+                async with stdio_client(server_params) as (read, write):
+                    async with ClientSession(read, write) as session:
+                        await session.initialize()
+                        result = await session.list_tools()
+                        tools = [
+                            {
+                                "name": tool.name,
+                                "description": tool.description or "",
+                                "inputSchema": tool.inputSchema if hasattr(tool, "inputSchema") else {},
+                            }
+                            for tool in result.tools
+                        ]
+            except Exception as e:
+                console.print(f"[yellow]Warning: Could not introspect stdio server: {e}[/yellow]")
 
         return tools
 
@@ -280,7 +356,7 @@ class MCPToSkillConverter:
             "version": "1.0.0",
             "description": f"Claude Skill for {server_name} MCP server",
             "mode": "daemon" if is_daemon else "standard",
-            "dependencies": {"mcp": ">=1.0.0"},
+            "dependencies": {"mcp": ">=1.22.0"},
         }
 
         # Add aiohttp dependency for daemon mode

@@ -140,8 +140,8 @@ LLM_MODEL=deepseek-chat
     "chrome-devtools": {
       "command": "npx",
       "args": ["chrome-devtools-mcp@latest"],
-      "daemon": true,          // 启用守护进程模式
-      "daemon_timeout": 3600   // 空闲 1 小时后自动关闭（可选）
+      "daemon": true, // 启用守护进程模式
+      "daemon_timeout": 3600 // 空闲 1 小时后自动关闭（可选）
     }
   }
 }
@@ -194,6 +194,12 @@ python executor.py --call '{"tool": "take_snapshot", "arguments": {}}'
 - **Claude Code** - Anthropic 官方 CLI
 - **Kilocode** - AI 开发环境
 
+### 支持的传输类型
+
+MCP2Skills 支持所有三种官方 MCP 传输类型：
+
+#### 1. stdio（本地进程）
+
 ```json
 {
   "mcpServers": {
@@ -202,16 +208,46 @@ python executor.py --call '{"tool": "take_snapshot", "arguments": {}}'
       "args": ["-y", "@modelcontextprotocol/server-github"],
       "env": {
         "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_your_token"
-      }
-    },
-    "filesystem": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/允许的路径"],
+      },
       "type": "stdio"
     }
   }
 }
 ```
+
+#### 2. SSE（服务器推送事件）
+
+```json
+{
+  "mcpServers": {
+    "example-sse": {
+      "url": "https://api.example.com/sse",
+      "type": "sse",
+      "headers": {
+        "Authorization": "Bearer your-token"
+      }
+    }
+  }
+}
+```
+
+#### 3. streamable-http（推荐用于生产环境）
+
+```json
+{
+  "mcpServers": {
+    "web-reader": {
+      "url": "https://api.example.com/mcp",
+      "type": "streamable-http",
+      "headers": {
+        "X-API-Key": "your-api-key"
+      }
+    }
+  }
+}
+```
+
+**注意**：streamable-http 支持需要 MCP SDK >= 1.22.0
 
 ## 紧凑模式（渐进式披露）
 
