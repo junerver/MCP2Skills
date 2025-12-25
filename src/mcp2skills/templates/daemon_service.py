@@ -47,6 +47,7 @@ except ImportError:
 # Configuration
 DAEMON_HOST = "127.0.0.1"
 DAEMON_PORT = {daemon_port}
+DAEMON_TIMEOUT = {daemon_timeout}  # seconds, 0 means no timeout
 SKILL_DIR = Path(__file__).parent
 CONFIG_PATH = SKILL_DIR / "mcp-config.json"
 PID_FILE = SKILL_DIR / ".daemon.pid"
@@ -83,7 +84,9 @@ class MCPDaemonService:
         self.tools_cache = None
         self.last_error: Optional[str] = None
         self.connection_time: Optional[float] = None
+        self.last_activity: Optional[float] = None
         self.reconnect_task: Optional[asyncio.Task] = None
+        self.timeout_task: Optional[asyncio.Task] = None
         self._lock = asyncio.Lock()
 
     def load_config(self) -> dict:
@@ -147,6 +150,7 @@ class MCPDaemonService:
                 
                 self.connected = True
                 self.connection_time = time.time()
+                self.last_activity = time.time()
                 self.last_error = None
                 self.tools_cache = None  # Clear cache on reconnect
                 
@@ -159,10 +163,15 @@ class MCPDaemonService:
                 logger.error(f"Failed to connect to MCP server: {e}")
                 return False
 
+    def update_activity(self):
+        """Update last activity timestamp."""
+        self.last_activity = time.time()
+
     async def ensure_connected(self) -> bool:
         """Ensure connection is established, reconnect if needed."""
         if not self.connected or not self.session:
             return await self.connect()
+        self.update_activity()
         return True
 
     async def list_tools(self) -> list[dict]:
@@ -216,6 +225,13 @@ class MCPDaemonService:
         """Gracefully shutdown the daemon."""
         logger.info("Shutting down daemon...")
         self.running = False
+        
+        if self.timeout_task:
+            self.timeout_task.cancel()
+            try:
+                await self.timeout_task
+            except asyncio.CancelledError:
+                pass
         
         if self.reconnect_task:
             self.reconnect_task.cancel()
@@ -386,6 +402,21 @@ async def start_server():
     return runner
 
 
+async def check_timeout():
+    """Check for inactivity timeout and shutdown if exceeded."""
+    if DAEMON_TIMEOUT <= 0:
+        return  # No timeout configured
+    
+    while daemon.running:
+        await asyncio.sleep(60)  # Check every minute
+        if daemon.last_activity:
+            idle_time = time.time() - daemon.last_activity
+            if idle_time > DAEMON_TIMEOUT:
+                logger.info(f"Idle timeout ({DAEMON_TIMEOUT}s) exceeded, shutting down...")
+                await shutdown_server()
+                return
+
+
 async def main():
     """Main entry point."""
     # Write PID file
@@ -402,6 +433,11 @@ async def main():
     
     # Start HTTP server
     runner = await start_server()
+    
+    # Start timeout checker if configured
+    if DAEMON_TIMEOUT > 0:
+        daemon.timeout_task = asyncio.create_task(check_timeout())
+        logger.info(f"Idle timeout: {DAEMON_TIMEOUT}s")
     
     logger.info(f"MCP Daemon running on http://{DAEMON_HOST}:{DAEMON_PORT}")
     logger.info("Endpoints: /health, /tools, /tools/<name>, /call, /shutdown")

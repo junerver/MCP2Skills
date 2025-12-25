@@ -11,6 +11,7 @@ def generate_skill_md(
     examples: str,
     is_daemon: bool = False,
     compact_mode: bool = False,
+    daemon_timeout: int = 0,
 ) -> str:
     """Generate SKILL.md content following Anthropic best practices.
     
@@ -32,7 +33,7 @@ def generate_skill_md(
 
     # Generate execution instructions based on mode
     if is_daemon:
-        execution_section = _generate_daemon_execution_section()
+        execution_section = _generate_daemon_execution_section(daemon_timeout)
     else:
         execution_section = _generate_standard_execution_section()
 
@@ -90,9 +91,18 @@ If execution fails:
 3. Ensure MCP server dependencies are installed"""
 
 
-def _generate_daemon_execution_section() -> str:
+def _generate_daemon_execution_section(daemon_timeout: int = 0) -> str:
     """Generate execution section for daemon mode."""
-    return """### Execution (Daemon Mode)
+    timeout_note = ""
+    if daemon_timeout > 0:
+        hours = daemon_timeout // 3600
+        minutes = (daemon_timeout % 3600) // 60
+        if hours > 0:
+            timeout_note = f"\n- **Auto-shutdown**: Daemon will automatically stop after {hours}h {minutes}m of inactivity"
+        else:
+            timeout_note = f"\n- **Auto-shutdown**: Daemon will automatically stop after {minutes} minutes of inactivity"
+    
+    return f"""### Execution (Daemon Mode)
 
 This skill uses a persistent daemon for faster tool execution. The daemon maintains a long-lived connection to the MCP server, eliminating connection overhead between calls.
 
@@ -119,7 +129,17 @@ python executor.py --stop
 - The daemon starts automatically on first tool call
 - It runs in the background and persists across multiple calls
 - Use `--status` to check if daemon is running
-- Use `--stop` to gracefully shutdown the daemon
+- Use `--stop` to gracefully shutdown the daemon{timeout_note}
+
+### Daemon Lifecycle
+
+**Important**: When you finish using this skill (e.g., completing a task, ending a session, or switching to other work), please stop the daemon to release system resources:
+
+```bash
+python executor.py --stop
+```
+
+The daemon will automatically restart when needed for future tool calls.
 
 ### Error Handling
 

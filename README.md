@@ -140,11 +140,21 @@ For MCP servers that require persistent connections (e.g., browser automation to
     "chrome-devtools": {
       "command": "npx",
       "args": ["chrome-devtools-mcp@latest"],
-      "daemon": true  // Enable daemon mode
+      "daemon": true,          // Enable daemon mode
+      "daemon_timeout": 3600   // Auto-shutdown after 1 hour of inactivity (optional)
     }
   }
 }
 ```
+
+### Daemon Lifecycle Management
+
+The daemon process persists after the AI session ends. Two mechanisms handle cleanup:
+
+1. **AI-Prompted Shutdown**: SKILL.md instructs AI to run `python executor.py --stop` when finishing tasks
+2. **Auto-Timeout**: Configure `daemon_timeout` (seconds) for automatic shutdown after inactivity
+   - `0` or omitted = no timeout (manual shutdown only)
+   - Example: `3600` = shutdown after 1 hour idle
 
 When daemon mode is enabled, MCP2Skills generates:
 

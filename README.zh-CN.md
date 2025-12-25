@@ -140,11 +140,21 @@ LLM_MODEL=deepseek-chat
     "chrome-devtools": {
       "command": "npx",
       "args": ["chrome-devtools-mcp@latest"],
-      "daemon": true // 启用守护进程模式
+      "daemon": true,          // 启用守护进程模式
+      "daemon_timeout": 3600   // 空闲 1 小时后自动关闭（可选）
     }
   }
 }
 ```
+
+### 守护进程生命周期管理
+
+守护进程在 AI 会话结束后仍会持续运行。提供两种清理机制：
+
+1. **AI 提示关闭**：SKILL.md 会指导 AI 在完成任务时执行 `python executor.py --stop`
+2. **自动超时**：配置 `daemon_timeout`（秒）实现空闲后自动关闭
+   - `0` 或不设置 = 无超时（仅手动关闭）
+   - 示例：`3600` = 空闲 1 小时后关闭
 
 启用守护进程模式后，MCP2Skills 会生成：
 

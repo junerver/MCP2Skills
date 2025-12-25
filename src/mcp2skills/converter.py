@@ -47,6 +47,10 @@ class MCPToSkillConverter:
         """Check if the MCP server should run in daemon mode."""
         return config.get("daemon", False) is True
 
+    def get_daemon_timeout(self, config: dict[str, Any]) -> int:
+        """Get daemon timeout in seconds (0 = no timeout)."""
+        return config.get("daemon_timeout", 0)
+
     async def introspect_mcp_server(self, config: dict[str, Any]) -> list[dict[str, Any]]:
         """Connect to MCP server and discover available tools."""
         try:
@@ -129,13 +133,15 @@ class MCPToSkillConverter:
             tools = self._enhance_tools(tools)
 
         # Generate skill files based on mode
-        self._generate_skill_md(server_name, tools, output_dir, is_daemon, compact_mode)
+        daemon_timeout = self.get_daemon_timeout(config) if is_daemon else 0
+        self._generate_skill_md(server_name, tools, output_dir, is_daemon, compact_mode, daemon_timeout)
         
         if is_daemon:
             daemon_port = generate_daemon_port(server_name)
-            console.print(f"  [cyan]Daemon mode enabled (port: {daemon_port})[/cyan]")
+            timeout_str = f", timeout: {daemon_timeout}s" if daemon_timeout > 0 else ""
+            console.print(f"  [cyan]Daemon mode enabled (port: {daemon_port}{timeout_str})[/cyan]")
             self._generate_daemon_executor(output_dir, daemon_port)
-            self._generate_daemon_service(output_dir, daemon_port)
+            self._generate_daemon_service(output_dir, daemon_port, daemon_timeout)
         else:
             self._generate_executor(output_dir)
         
@@ -172,6 +178,7 @@ class MCPToSkillConverter:
         output_dir: Path,
         is_daemon: bool = False,
         compact_mode: Optional[bool] = None,
+        daemon_timeout: int = 0,
     ) -> None:
         """Generate SKILL.md file.
         
@@ -210,6 +217,7 @@ class MCPToSkillConverter:
             examples=examples,
             is_daemon=is_daemon,
             compact_mode=compact_mode,
+            daemon_timeout=daemon_timeout,
         )
 
         skill_path = output_dir / "SKILL.md"
@@ -246,9 +254,10 @@ class MCPToSkillConverter:
         executor_path = output_dir / "executor.py"
         executor_path.write_text(executor_content, encoding="utf-8")
 
-    def _generate_daemon_service(self, output_dir: Path, daemon_port: int) -> None:
+    def _generate_daemon_service(self, output_dir: Path, daemon_port: int, daemon_timeout: int = 0) -> None:
         """Generate mcp_daemon.py service file."""
         daemon_content = DAEMON_SERVICE_TEMPLATE.replace("{daemon_port}", str(daemon_port))
+        daemon_content = daemon_content.replace("{daemon_timeout}", str(daemon_timeout))
         daemon_path = output_dir / "mcp_daemon.py"
         daemon_path.write_text(daemon_content, encoding="utf-8")
 
