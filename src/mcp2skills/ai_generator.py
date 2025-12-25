@@ -1,9 +1,8 @@
-# -*- coding: utf-8 -*-
 """AI-powered skill generator using LLM."""
 
 import json
 import os
-from typing import Any, Optional
+from typing import Any
 
 from openai import OpenAI
 from rich.console import Console
@@ -62,7 +61,7 @@ class AISkillGenerator:
 
     def __init__(self, settings: Settings):
         self.settings = settings
-        self.client: Optional[OpenAI] = None
+        self.client: OpenAI | None = None
 
         if settings.validate_llm_config():
             self.client = OpenAI(
@@ -84,7 +83,9 @@ class AISkillGenerator:
             if data:
                 console.print(f"[dim]{data}[/dim]")
 
-    def _call_llm(self, messages: list[dict], max_tokens: int = 200, temperature: float = None) -> Optional[str]:
+    def _call_llm(
+        self, messages: list[dict], max_tokens: int = 200, temperature: float = None
+    ) -> str | None:
         """Make an LLM API call with error handling and debug logging."""
         if not self.client:
             return None
@@ -93,8 +94,12 @@ class AISkillGenerator:
             temperature = self.settings.llm.temperature
 
         self._debug_log(f"LLM Request to {self.settings.llm.base_url}")
-        self._debug_log(f"Model: {self.settings.llm.model}, Temperature: {temperature}, Max tokens: {max_tokens}")
-        self._debug_log("Messages:", json.dumps(messages, indent=2, ensure_ascii=False)[:500] + "...")
+        self._debug_log(
+            f"Model: {self.settings.llm.model}, Temperature: {temperature}, Max tokens: {max_tokens}"
+        )
+        self._debug_log(
+            "Messages:", json.dumps(messages, indent=2, ensure_ascii=False)[:500] + "..."
+        )
 
         try:
             response = self.client.chat.completions.create(
@@ -108,7 +113,9 @@ class AISkillGenerator:
             self._debug_log(f"LLM Response (full): {result}")
             self._debug_log(f"Finish reason: {finish_reason}")
             if finish_reason == "length":
-                console.print(f"[yellow]Warning: AI response was truncated (max_tokens={max_tokens})[/yellow]")
+                console.print(
+                    f"[yellow]Warning: AI response was truncated (max_tokens={max_tokens})[/yellow]"
+                )
             return result
         except Exception as e:
             error_msg = str(e)
@@ -117,7 +124,7 @@ class AISkillGenerator:
             self._debug_log(f"LLM Error: {error_msg}")
 
             # Try to get more details from the exception
-            if hasattr(e, 'response'):
+            if hasattr(e, "response"):
                 try:
                     resp = e.response
                     self._debug_log(f"Response Status: {resp.status_code}")
@@ -199,14 +206,19 @@ Requirements:
 Return ONLY the description text."""
 
         messages = [
-            {"role": "system", "content": "You are a technical writer creating tool documentation."},
+            {
+                "role": "system",
+                "content": "You are a technical writer creating tool documentation.",
+            },
             {"role": "user", "content": prompt},
         ]
 
         result = self._call_llm(messages, max_tokens=500, temperature=0.3)
         return result if result else original_desc
 
-    def generate_parameter_description(self, param_name: str, param_schema: dict[str, Any], tool_name: str) -> str:
+    def generate_parameter_description(
+        self, param_name: str, param_schema: dict[str, Any], tool_name: str
+    ) -> str:
         """Generate a description for a parameter that lacks one."""
         if not self.is_available():
             return self._infer_param_description(param_name, param_schema)
@@ -235,10 +247,9 @@ Return ONLY the description text."""
 
         # Select representative tools
         sample_tools = tools[:3] if len(tools) > 3 else tools
-        tool_info = "\n".join([
-            f"- {t.get('name')}: {t.get('description', '')[:100]}"
-            for t in sample_tools
-        ])
+        tool_info = "\n".join(
+            [f"- {t.get('name')}: {t.get('description', '')[:100]}" for t in sample_tools]
+        )
 
         prompt = f"""Generate 2-3 realistic bash examples for this skill.
 
@@ -313,13 +324,15 @@ Return ONLY the markdown code block with bash syntax."""
         if tools:
             tool = tools[0]
             tool_name = tool.get("name", "example")
-            examples.extend([
-                f"# Get tool details",
-                f"python executor.py --describe {tool_name}",
-                "",
-                f"# Execute a tool",
-                f'python executor.py --call \'{{"tool": "{tool_name}", "arguments": {{}}}}\'',
-            ])
+            examples.extend(
+                [
+                    "# Get tool details",
+                    f"python executor.py --describe {tool_name}",
+                    "",
+                    "# Execute a tool",
+                    f'python executor.py --call \'{{"tool": "{tool_name}", "arguments": {{}}}}\'',
+                ]
+            )
 
         examples.append("```")
         return "\n".join(examples)

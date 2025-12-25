@@ -1,12 +1,10 @@
-# -*- coding: utf-8 -*-
 """Configuration management for MCP2Skills."""
 
 import os
 from pathlib import Path
-from typing import Optional
 
-from pydantic import BaseModel, Field
 from dotenv import load_dotenv
+from pydantic import BaseModel, Field
 
 
 class LLMSettings(BaseModel):
@@ -14,24 +12,13 @@ class LLMSettings(BaseModel):
 
     api_key: str = Field(default="", description="API key for the LLM service")
     base_url: str = Field(
-        default="https://api.openai.com/v1",
-        description="Base URL for the LLM API"
+        default="https://api.openai.com/v1", description="Base URL for the LLM API"
     )
-    model: str = Field(
-        default="gpt-4o-mini",
-        description="Model name to use for generation"
-    )
+    model: str = Field(default="gpt-4o-mini", description="Model name to use for generation")
     temperature: float = Field(
-        default=0.7,
-        ge=0.0,
-        le=2.0,
-        description="Temperature for generation"
+        default=0.7, ge=0.0, le=2.0, description="Temperature for generation"
     )
-    max_tokens: int = Field(
-        default=4096,
-        ge=1,
-        description="Maximum tokens for generation"
-    )
+    max_tokens: int = Field(default=4096, ge=1, description="Maximum tokens for generation")
 
 
 class Settings(BaseModel):
@@ -42,34 +29,27 @@ class Settings(BaseModel):
 
     # Paths
     mcp_config_file: Path = Field(
-        default=Path("mcpservers.json"),
-        description="Path to MCP servers configuration file"
+        default=Path("mcpservers.json"), description="Path to MCP servers configuration file"
     )
     servers_dir: Path = Field(
-        default=Path("servers"),
-        description="Directory for split server configs"
+        default=Path("servers"), description="Directory for split server configs"
     )
     output_dir: Path = Field(
-        default=Path("skills"),
-        description="Output directory for generated skills"
+        default=Path("skills"), description="Output directory for generated skills"
     )
 
     # Generation options
-    use_ai: bool = Field(
-        default=True,
-        description="Use AI to enhance skill generation"
-    )
+    use_ai: bool = Field(default=True, description="Use AI to enhance skill generation")
     skill_prefix: str = Field(
-        default="skill-",
-        description="Prefix for generated skill directories"
+        default="skill-", description="Prefix for generated skill directories"
     )
-    compact_mode: Optional[bool] = Field(
+    compact_mode: bool | None = Field(
         default=None,
-        description="Use compact SKILL.md with separate references. None=auto-detect based on tool count"
+        description="Use compact SKILL.md with separate references. None=auto-detect based on tool count",
     )
 
     @classmethod
-    def from_env(cls, env_file: Optional[Path] = None) -> "Settings":
+    def from_env(cls, env_file: Path | None = None) -> "Settings":
         """Load settings from environment variables."""
         if env_file:
             load_dotenv(env_file)

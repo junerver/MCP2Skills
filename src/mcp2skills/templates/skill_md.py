@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """SKILL.md template generator following Anthropic best practices."""
 
 from typing import Any
@@ -14,7 +13,7 @@ def generate_skill_md(
     daemon_timeout: int = 0,
 ) -> str:
     """Generate SKILL.md content following Anthropic best practices.
-    
+
     Args:
         server_name: The name of the MCP server
         description: Server description for the frontmatter
@@ -101,7 +100,7 @@ def _generate_daemon_execution_section(daemon_timeout: int = 0) -> str:
             timeout_note = f"\n- **Auto-shutdown**: Daemon will automatically stop after {hours}h {minutes}m of inactivity"
         else:
             timeout_note = f"\n- **Auto-shutdown**: Daemon will automatically stop after {minutes} minutes of inactivity"
-    
+
     return f"""### Execution (Daemon Mode)
 
 This skill uses a persistent daemon for faster tool execution. The daemon maintains a long-lived connection to the MCP server, eliminating connection overhead between calls.
@@ -173,7 +172,7 @@ def _generate_reference_note(tools: list[dict[str, Any]], compact: bool) -> str:
 
 def _generate_tool_docs(tools: list[dict[str, Any]], compact: bool = False) -> str:
     """Generate tool documentation with smart grouping.
-    
+
     Args:
         tools: List of tool definitions
         compact: If True, only show tool names and brief descriptions (no parameters)
@@ -206,9 +205,24 @@ def _group_tools(tools: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]
 
     # Common action prefixes
     action_prefixes = [
-        "create", "get", "list", "update", "delete", "search",
-        "add", "remove", "set", "read", "write", "edit",
-        "push", "pull", "merge", "fork", "close", "open",
+        "create",
+        "get",
+        "list",
+        "update",
+        "delete",
+        "search",
+        "add",
+        "remove",
+        "set",
+        "read",
+        "write",
+        "edit",
+        "push",
+        "pull",
+        "merge",
+        "fork",
+        "close",
+        "open",
     ]
 
     for tool in tools:
@@ -251,7 +265,7 @@ def _group_tools(tools: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]
 
 def _format_tool(tool: dict[str, Any], compact: bool = False) -> list[str]:
     """Format a single tool's documentation.
-    
+
     Args:
         tool: Tool definition dict
         compact: If True, only show name and brief description (no parameters)
@@ -259,11 +273,11 @@ def _format_tool(tool: dict[str, Any], compact: bool = False) -> list[str]:
     lines = []
     name = tool.get("name", "unknown")
     description = tool.get("description", "")
-    
+
     # Truncate long descriptions in compact mode
     if compact and description:
         # Keep only the first sentence or first 100 chars
-        first_sentence = description.split('. ')[0]
+        first_sentence = description.split(". ")[0]
         if len(first_sentence) > 100:
             description = first_sentence[:97] + "..."
         else:
@@ -317,7 +331,7 @@ def generate_tools_reference(
     tools: list[dict[str, Any]],
 ) -> str:
     """Generate a detailed tools reference file for the references/ directory.
-    
+
     This file contains complete parameter documentation for all tools,
     following the progressive disclosure principle.
     """
@@ -329,25 +343,25 @@ def generate_tools_reference(
         "## Tools",
         "",
     ]
-    
+
     for tool in tools:
         name = tool.get("name", "unknown")
         description = tool.get("description", "")
-        
+
         lines.append(f"### `{name}`")
         lines.append("")
         if description:
             lines.append(description)
             lines.append("")
-        
+
         schema = tool.get("inputSchema", {})
         properties = schema.get("properties", {})
         required = set(schema.get("required", []))
-        
+
         if properties:
             req_params = [(k, v) for k, v in properties.items() if k in required]
             opt_params = [(k, v) for k, v in properties.items() if k not in required]
-            
+
             if req_params:
                 lines.append("**Required Parameters:**")
                 lines.append("")
@@ -358,7 +372,7 @@ def generate_tools_reference(
                     if param_desc:
                         lines.append(f"  - {param_desc}")
                 lines.append("")
-            
+
             if opt_params:
                 lines.append("**Optional Parameters:**")
                 lines.append("")
@@ -375,8 +389,8 @@ def generate_tools_reference(
         else:
             lines.append("*No parameters required.*")
             lines.append("")
-        
+
         lines.append("---")
         lines.append("")
-    
+
     return "\n".join(lines)

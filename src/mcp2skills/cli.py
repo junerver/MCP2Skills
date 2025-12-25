@@ -1,10 +1,8 @@
-# -*- coding: utf-8 -*-
 """CLI interface for MCP2Skills."""
 
-import sys
 import io
+import sys
 from pathlib import Path
-from typing import Optional
 
 import typer
 from rich.console import Console
@@ -12,7 +10,7 @@ from rich.panel import Panel
 
 from mcp2skills import __version__
 from mcp2skills.config import Settings
-from mcp2skills.converter import MCPToSkillConverter, BatchConverter
+from mcp2skills.converter import BatchConverter, MCPToSkillConverter
 
 # Fix Windows console encoding
 if sys.platform == "win32":
@@ -36,8 +34,12 @@ def version_callback(value: bool):
 @app.callback()
 def main(
     version: bool = typer.Option(
-        None, "--version", "-v", callback=version_callback, is_eager=True,
-        help="Show version and exit"
+        None,
+        "--version",
+        "-v",
+        callback=version_callback,
+        is_eager=True,
+        help="Show version and exit",
     ),
 ):
     """MCP2Skills - Convert MCP servers to Claude Skills."""
@@ -51,20 +53,26 @@ def convert(
         help="Path to MCP server config file (JSON)",
         exists=True,
     ),
-    output: Optional[Path] = typer.Option(
-        None, "--output", "-o",
+    output: Path | None = typer.Option(
+        None,
+        "--output",
+        "-o",
         help="Output directory for the skill",
     ),
     no_ai: bool = typer.Option(
-        False, "--no-ai",
+        False,
+        "--no-ai",
         help="Disable AI-powered enhancements",
     ),
-    compact: Optional[bool] = typer.Option(
-        None, "--compact",
+    compact: bool | None = typer.Option(
+        None,
+        "--compact",
         help="Use compact SKILL.md with separate references (auto-detected if >10 tools)",
     ),
-    env_file: Optional[Path] = typer.Option(
-        None, "--env", "-e",
+    env_file: Path | None = typer.Option(
+        None,
+        "--env",
+        "-e",
         help="Path to .env file for configuration",
     ),
 ):
@@ -81,43 +89,56 @@ def convert(
     converter = MCPToSkillConverter(settings)
     output_dir = converter.convert(config, output, compact_mode=compact)
 
-    console.print(Panel(
-        f"[green]Skill created successfully![/green]\n\n"
-        f"Location: {output_dir}\n\n"
-        f"To install:\n"
-        f"  cp -r {output_dir} ~/.claude/skills/",
-        title="Success",
-    ))
+    console.print(
+        Panel(
+            f"[green]Skill created successfully![/green]\n\n"
+            f"Location: {output_dir}\n\n"
+            f"To install:\n"
+            f"  cp -r {output_dir} ~/.claude/skills/",
+            title="Success",
+        )
+    )
 
 
 @app.command()
 def batch(
-    mcp_config: Optional[Path] = typer.Option(
-        None, "--config", "-c",
+    mcp_config: Path | None = typer.Option(
+        None,
+        "--config",
+        "-c",
         help="Path to mcpservers.json file",
     ),
-    servers_dir: Optional[Path] = typer.Option(
-        None, "--servers-dir", "-s",
+    servers_dir: Path | None = typer.Option(
+        None,
+        "--servers-dir",
+        "-s",
         help="Directory containing individual server configs",
     ),
-    output_dir: Optional[Path] = typer.Option(
-        None, "--output", "-o",
+    output_dir: Path | None = typer.Option(
+        None,
+        "--output",
+        "-o",
         help="Output directory for generated skills",
     ),
     skip_split: bool = typer.Option(
-        False, "--skip-split",
+        False,
+        "--skip-split",
         help="Skip splitting mcpservers.json (use existing servers/)",
     ),
     no_ai: bool = typer.Option(
-        False, "--no-ai",
+        False,
+        "--no-ai",
         help="Disable AI-powered enhancements",
     ),
-    compact: Optional[bool] = typer.Option(
-        None, "--compact",
+    compact: bool | None = typer.Option(
+        None,
+        "--compact",
         help="Use compact SKILL.md with separate references (auto-detected if >10 tools)",
     ),
-    env_file: Optional[Path] = typer.Option(
-        None, "--env", "-e",
+    env_file: Path | None = typer.Option(
+        None,
+        "--env",
+        "-e",
         help="Path to .env file for configuration",
     ),
 ):
@@ -144,19 +165,23 @@ def batch(
     results = batch_converter.convert_all(skip_split=skip_split)
 
     if results:
-        console.print(Panel(
-            f"[green]Batch conversion complete![/green]\n\n"
-            f"Created {len(results)} skills in {settings.output_dir}/\n\n"
-            f"To install all:\n"
-            f"  cp -r {settings.output_dir}/* ~/.claude/skills/",
-            title="Success",
-        ))
+        console.print(
+            Panel(
+                f"[green]Batch conversion complete![/green]\n\n"
+                f"Created {len(results)} skills in {settings.output_dir}/\n\n"
+                f"To install all:\n"
+                f"  cp -r {settings.output_dir}/* ~/.claude/skills/",
+                title="Success",
+            )
+        )
 
 
 @app.command()
 def init(
     output: Path = typer.Option(
-        Path(".env.example"), "--output", "-o",
+        Path(".env.example"),
+        "--output",
+        "-o",
         help="Output path for the example .env file",
     ),
 ):

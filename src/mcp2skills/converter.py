@@ -1,20 +1,18 @@
-# -*- coding: utf-8 -*-
 """Core MCP to Skill converter."""
 
 import asyncio
-import json
-import sys
 import hashlib
+import json
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from rich.console import Console
 
-from mcp2skills.config import Settings
 from mcp2skills.ai_generator import AISkillGenerator
-from mcp2skills.templates.executor import EXECUTOR_TEMPLATE
+from mcp2skills.config import Settings
 from mcp2skills.templates.daemon_executor import DAEMON_EXECUTOR_TEMPLATE
 from mcp2skills.templates.daemon_service import DAEMON_SERVICE_TEMPLATE
+from mcp2skills.templates.executor import EXECUTOR_TEMPLATE
 from mcp2skills.templates.skill_md import generate_skill_md, generate_tools_reference
 
 console = Console()
@@ -39,7 +37,7 @@ def generate_daemon_port(server_name: str) -> int:
 class MCPToSkillConverter:
     """Convert MCP server configurations to Claude Skills."""
 
-    def __init__(self, settings: Optional[Settings] = None):
+    def __init__(self, settings: Settings | None = None):
         self.settings = settings or Settings.from_env()
         self.ai_generator = AISkillGenerator(self.settings)
 
@@ -92,11 +90,11 @@ class MCPToSkillConverter:
     def convert(
         self,
         config_path: Path,
-        output_dir: Optional[Path] = None,
-        compact_mode: Optional[bool] = None,
+        output_dir: Path | None = None,
+        compact_mode: bool | None = None,
     ) -> Path:
         """Convert a single MCP config to a Claude Skill.
-        
+
         Args:
             config_path: Path to the MCP server config file
             output_dir: Optional output directory for the skill
@@ -105,7 +103,7 @@ class MCPToSkillConverter:
                          If False, include all details in SKILL.md.
         """
         # Load config
-        with open(config_path, "r", encoding="utf-8") as f:
+        with open(config_path, encoding="utf-8") as f:
             config = json.load(f)
 
         server_name = config.get("name", config_path.stem)
@@ -134,8 +132,10 @@ class MCPToSkillConverter:
 
         # Generate skill files based on mode
         daemon_timeout = self.get_daemon_timeout(config) if is_daemon else 0
-        self._generate_skill_md(server_name, tools, output_dir, is_daemon, compact_mode, daemon_timeout)
-        
+        self._generate_skill_md(
+            server_name, tools, output_dir, is_daemon, compact_mode, daemon_timeout
+        )
+
         if is_daemon:
             daemon_port = generate_daemon_port(server_name)
             timeout_str = f", timeout: {daemon_timeout}s" if daemon_timeout > 0 else ""
@@ -144,7 +144,7 @@ class MCPToSkillConverter:
             self._generate_daemon_service(output_dir, daemon_port, daemon_timeout)
         else:
             self._generate_executor(output_dir)
-        
+
         self._generate_mcp_config(config, output_dir)
         self._generate_package_json(server_name, output_dir, is_daemon)
 
@@ -177,11 +177,11 @@ class MCPToSkillConverter:
         tools: list[dict[str, Any]],
         output_dir: Path,
         is_daemon: bool = False,
-        compact_mode: Optional[bool] = None,
+        compact_mode: bool | None = None,
         daemon_timeout: int = 0,
     ) -> None:
         """Generate SKILL.md file.
-        
+
         Args:
             server_name: Name of the MCP server
             tools: List of tool definitions
@@ -194,10 +194,12 @@ class MCPToSkillConverter:
         # Auto-detect compact mode based on tool count (progressive disclosure)
         if compact_mode is None:
             compact_mode = len(tools) > COMPACT_MODE_THRESHOLD
-        
+
         if compact_mode:
-            console.print(f"  [cyan]Using compact mode ({len(tools)} tools > {COMPACT_MODE_THRESHOLD})[/cyan]")
-        
+            console.print(
+                f"  [cyan]Using compact mode ({len(tools)} tools > {COMPACT_MODE_THRESHOLD})[/cyan]"
+            )
+
         # Generate description
         if self.ai_generator.is_available():
             description = self.ai_generator.generate_description(server_name, tools)
@@ -222,11 +224,11 @@ class MCPToSkillConverter:
 
         skill_path = output_dir / "SKILL.md"
         skill_path.write_text(content, encoding="utf-8")
-        
+
         # Generate references/tools.md for compact mode
         if compact_mode:
             self._generate_tools_reference(server_name, tools, output_dir)
-    
+
     def _generate_tools_reference(
         self,
         server_name: str,
@@ -236,12 +238,12 @@ class MCPToSkillConverter:
         """Generate references/tools.md file with detailed tool documentation."""
         references_dir = output_dir / "references"
         references_dir.mkdir(parents=True, exist_ok=True)
-        
+
         content = generate_tools_reference(server_name, tools)
-        
+
         tools_ref_path = references_dir / "tools.md"
         tools_ref_path.write_text(content, encoding="utf-8")
-        console.print(f"  [green]Created references/tools.md[/green]")
+        console.print("  [green]Created references/tools.md[/green]")
 
     def _generate_executor(self, output_dir: Path) -> None:
         """Generate standard executor.py file."""
@@ -254,7 +256,9 @@ class MCPToSkillConverter:
         executor_path = output_dir / "executor.py"
         executor_path.write_text(executor_content, encoding="utf-8")
 
-    def _generate_daemon_service(self, output_dir: Path, daemon_port: int, daemon_timeout: int = 0) -> None:
+    def _generate_daemon_service(
+        self, output_dir: Path, daemon_port: int, daemon_timeout: int = 0
+    ) -> None:
         """Generate mcp_daemon.py service file."""
         daemon_content = DAEMON_SERVICE_TEMPLATE.replace("{daemon_port}", str(daemon_port))
         daemon_content = daemon_content.replace("{daemon_timeout}", str(daemon_timeout))
@@ -267,22 +271,22 @@ class MCPToSkillConverter:
         with open(config_path, "w", encoding="utf-8") as f:
             json.dump(config, f, indent=2, ensure_ascii=False)
 
-    def _generate_package_json(self, server_name: str, output_dir: Path, is_daemon: bool = False) -> None:
+    def _generate_package_json(
+        self, server_name: str, output_dir: Path, is_daemon: bool = False
+    ) -> None:
         """Generate package.json file."""
         package = {
             "name": f"skill-{server_name}",
             "version": "1.0.0",
             "description": f"Claude Skill for {server_name} MCP server",
             "mode": "daemon" if is_daemon else "standard",
-            "dependencies": {
-                "mcp": ">=1.0.0"
-            }
+            "dependencies": {"mcp": ">=1.0.0"},
         }
-        
+
         # Add aiohttp dependency for daemon mode
         if is_daemon:
             package["dependencies"]["aiohttp"] = ">=3.8.0"
-        
+
         package_path = output_dir / "package.json"
         with open(package_path, "w", encoding="utf-8") as f:
             json.dump(package, f, indent=2, ensure_ascii=False)
@@ -291,7 +295,7 @@ class MCPToSkillConverter:
 class BatchConverter:
     """Batch convert multiple MCP servers to Skills."""
 
-    def __init__(self, settings: Optional[Settings] = None):
+    def __init__(self, settings: Settings | None = None):
         self.settings = settings or Settings.from_env()
         self.converter = MCPToSkillConverter(settings)
 
@@ -302,7 +306,7 @@ class BatchConverter:
             console.print(f"[red]Config file not found: {config_file}[/red]")
             return 0
 
-        with open(config_file, "r", encoding="utf-8") as f:
+        with open(config_file, encoding="utf-8") as f:
             data = json.load(f)
 
         mcp_servers = data.get("mcpServers", {})
@@ -335,15 +339,17 @@ class BatchConverter:
             console.print(f"  [green]OK[/green] {server_name}.json")
             count += 1
 
-        console.print(f"\n[green]Split {count} server configs to {self.settings.servers_dir}/[/green]")
+        console.print(
+            f"\n[green]Split {count} server configs to {self.settings.servers_dir}/[/green]"
+        )
         return count
 
     def convert_all(self, skip_split: bool = False) -> list[Path]:
         """Convert all MCP servers to Skills.
-        
+
         Args:
             skip_split: Skip splitting mcpservers.json
-            
+
         Returns:
             List of output directories for created skills
         """
@@ -364,7 +370,7 @@ class BatchConverter:
         console.print(f"\n[blue]Converting {len(configs)} MCP servers...[/blue]\n")
 
         # Get compact_mode from settings (can be None for auto-detect)
-        compact_mode = getattr(self.settings, 'compact_mode', None)
+        compact_mode = getattr(self.settings, "compact_mode", None)
 
         # Step 3: Convert each server
         results = []
@@ -375,5 +381,7 @@ class BatchConverter:
             except Exception as e:
                 console.print(f"[red]Failed to convert {config_path.name}: {e}[/red]")
 
-        console.print(f"\n[green]Successfully converted {len(results)}/{len(configs)} servers[/green]")
+        console.print(
+            f"\n[green]Successfully converted {len(results)}/{len(configs)} servers[/green]"
+        )
         return results

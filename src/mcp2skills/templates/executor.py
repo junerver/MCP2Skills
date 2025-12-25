@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Executor template for generated skills."""
 
 EXECUTOR_TEMPLATE = '''#!/usr/bin/env python3
