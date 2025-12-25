@@ -16,21 +16,47 @@
 
 ## 安装
 
-### 使用 uv（推荐）
+### 🌟 快速安装（适合所有用户）
 
-```bash
-# 克隆仓库
+如果你是**非 Python 用户**或想要最简单的安装方式，我们推荐使用 [uv](https://docs.astral.sh/uv/) - 一个快速的 Python 包管理器，无需预先安装 Python：
+
+#### Windows 用户
+
+```powershell
+# 1. 安装 uv（会自动处理 Python 环境）
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+# 2. 克隆并进入项目
 git clone https://github.com/junerver/MCP2Skills.git
 cd MCP2Skills
 
-# 使用 uv 安装
+# 3. 安装依赖（uv 会自动下载 Python）
 uv sync
 
-# 运行
+# 4. 运行
 uv run mcp2skills --help
 ```
 
-### 使用 pip
+#### macOS/Linux 用户
+
+```bash
+# 1. 安装 uv（会自动处理 Python 环境）
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# 2. 克隆并进入项目
+git clone https://github.com/junerver/MCP2Skills.git
+cd MCP2Skills
+
+# 3. 安装依赖（uv 会自动下载 Python）
+uv sync
+
+# 4. 运行
+uv run mcp2skills --help
+```
+
+### 🐍 Python 用户的传统方式
+
+如果你已经有 Python 环境并熟悉 pip：
 
 ```bash
 # 克隆并安装
@@ -42,49 +68,86 @@ pip install -e .
 mcp2skills --help
 ```
 
+> **注意**：使用 uv 时，所有命令都需要加 `uv run` 前缀（如 `uv run mcp2skills`）。使用 pip 安装后可以直接运行 `mcp2skills`。
+
 ## 快速开始
 
-### 1. 配置 LLM（可选但推荐）
+### 1️⃣ 配置 LLM（可选但强烈推荐）
+
+AI 增强模式可以自动生成高质量的工具描述和示例，提升技能质量。
 
 ```bash
-# 生成示例配置
-mcp2skills init
+# 生成配置模板
+uv run mcp2skills init    # 如果使用 uv
+# 或
+mcp2skills init            # 如果使用 pip
 
-# 编辑 .env 添加 API 密钥
+# 复制并编辑配置文件
 cp .env.example .env
-# 编辑 .env: LLM_API_KEY=your-key-here
+# 在 .env 中设置: LLM_API_KEY=your-api-key-here
 ```
 
-### 2. 转换单个 MCP 服务器
+**支持的 LLM 提供商**：OpenAI、Azure OpenAI、DeepSeek、本地模型（Ollama/LM Studio）等任何 OpenAI 兼容 API。
 
-```bash
-# 创建 MCP 配置
-cat > github.json << 'EOF'
+> 💡 **跳过 AI 增强**：如果不想配置 LLM，可以在转换命令中添加 `--no-ai` 参数。
+
+### 2️⃣ 转换单个 MCP 服务器
+
+下面以 GitHub 服务器为例，展示如何转换：
+
+**步骤 1：创建 MCP 配置文件**
+
+创建 `github.json` 文件（Windows 用户可以用记事本创建）：
+
+```json
 {
   "name": "github",
   "command": "npx",
   "args": ["-y", "@modelcontextprotocol/server-github"],
-  "env": {"GITHUB_TOKEN": "ghp_your_token"}
+  "env": {
+    "GITHUB_TOKEN": "ghp_your_actual_token_here"
+  }
 }
-EOF
+```
 
-# 转换为 Skill
+**步骤 2：运行转换**
+
+```bash
+# uv 用户
+uv run mcp2skills convert github.json -o ./skills/github
+
+# pip 用户
 mcp2skills convert github.json -o ./skills/github
+```
 
-# 安装到 Claude
+**步骤 3：安装到 Claude**
+
+```bash
+# Windows (PowerShell)
+Copy-Item -Recurse -Force ./skills/github $env:USERPROFILE\.claude\skills\
+
+# macOS/Linux
 cp -r ./skills/github ~/.claude/skills/
 ```
 
-### 3. 批量转换多个服务器
+完成！重启 Claude Desktop 即可使用该技能。
+
+### 3️⃣ 批量转换多个服务器
+
+如果你使用 Roocode、Claude Code 或 Kilocode，已经有 `mcpservers.json` 配置文件：
 
 ```bash
-# 准备 mcpservers.json（Roocode/Claude Code/Kilocode 的标准格式）
-# 然后运行批量转换
+# uv 用户
+uv run mcp2skills batch
+
+# pip 用户
 mcp2skills batch
 
-# 或指定路径
-mcp2skills batch -c mcpservers.json -o ./skills
+# 自定义路径
+uv run mcp2skills batch -c path/to/mcpservers.json -o ./my-skills
 ```
+
+这会自动转换配置文件中的所有 MCP 服务器。
 
 ## 配置
 
@@ -289,21 +352,65 @@ python executor.py --describe <tool_name>
 2. **SKILL.md**（<5k tokens）：技能触发时加载 - 工具概览
 3. **references/tools.md**：按需加载 - 详细参数
 
-## CLI 命令
+## CLI 命令参考
+
+### 基础命令
 
 ```bash
-# 显示帮助
-mcp2skills --help
+# 显示帮助信息
+uv run mcp2skills --help        # uv 用户
+mcp2skills --help               # pip 用户
 
-# 转换单个服务器
-mcp2skills convert <config.json> [-o output_dir] [--no-ai] [--compact]
-
-# 批量转换
-mcp2skills batch [-c mcpservers.json] [-o skills/] [--skip-split] [--no-ai] [--compact]
-
-# 生成 .env 模板
-mcp2skills init [-o .env.example]
+# 查看版本
+uv run mcp2skills --version
 ```
+
+### 转换命令
+
+```bash
+# 转换单个 MCP 服务器
+uv run mcp2skills convert <config.json> [选项]
+
+选项:
+  -o, --output DIR     输出目录（默认: ./skills/<name>）
+  --no-ai              禁用 AI 增强（不需要配置 LLM）
+  --compact            强制启用紧凑模式（>10个工具时自动启用）
+
+示例:
+  uv run mcp2skills convert github.json
+  uv run mcp2skills convert github.json -o ./my-skills --no-ai
+```
+
+```bash
+# 批量转换多个服务器
+uv run mcp2skills batch [选项]
+
+选项:
+  -c, --config FILE    MCP配置文件（默认: mcpservers.json）
+  -o, --output DIR     输出根目录（默认: ./skills）
+  --skip-split         不拆分配置文件，直接使用原文件
+  --no-ai              禁用 AI 增强
+  --compact            对所有技能启用紧凑模式
+
+示例:
+  uv run mcp2skills batch
+  uv run mcp2skills batch -c my-servers.json -o ./output
+  uv run mcp2skills batch --no-ai --compact
+```
+
+```bash
+# 生成配置模板
+uv run mcp2skills init [选项]
+
+选项:
+  -o, --output FILE    输出文件路径（默认: .env.example）
+
+示例:
+  uv run mcp2skills init
+  uv run mcp2skills init -o .env
+```
+
+> 💡 **提示**: 如果使用 pip 安装，所有命令去掉 `uv run` 前缀即可。
 
 ## 工作原理
 

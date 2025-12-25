@@ -16,21 +16,47 @@ English | [简体中文](./README.zh-CN.md)
 
 ## Installation
 
-### Using uv (Recommended)
+### 🌟 Quick Install (For All Users)
 
-```bash
-# Clone the repository
+If you're **not a Python user** or want the simplest installation, we recommend [uv](https://docs.astral.sh/uv/) - a fast Python package manager that handles Python automatically:
+
+#### Windows Users
+
+```powershell
+# 1. Install uv (will handle Python automatically)
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+# 2. Clone and enter project
 git clone https://github.com/junerver/MCP2Skills.git
 cd MCP2Skills
 
-# Install with uv
+# 3. Install dependencies (uv downloads Python automatically)
 uv sync
 
-# Run
+# 4. Run
 uv run mcp2skills --help
 ```
 
-### Using pip
+#### macOS/Linux Users
+
+```bash
+# 1. Install uv (will handle Python automatically)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# 2. Clone and enter project
+git clone https://github.com/junerver/MCP2Skills.git
+cd MCP2Skills
+
+# 3. Install dependencies (uv downloads Python automatically)
+uv sync
+
+# 4. Run
+uv run mcp2skills --help
+```
+
+### 🐍 Traditional Way for Python Users
+
+If you already have Python and are familiar with pip:
 
 ```bash
 # Clone and install
@@ -42,49 +68,86 @@ pip install -e .
 mcp2skills --help
 ```
 
+> **Note**: When using uv, prefix all commands with `uv run` (e.g., `uv run mcp2skills`). With pip installation, you can run `mcp2skills` directly.
+
 ## Quick Start
 
-### 1. Configure LLM (Optional but Recommended)
+### 1️⃣ Configure LLM (Optional but Highly Recommended)
+
+AI-enhanced mode automatically generates high-quality tool descriptions and examples, improving skill quality.
 
 ```bash
-# Generate example config
-mcp2skills init
+# Generate config template
+uv run mcp2skills init    # If using uv
+# or
+mcp2skills init            # If using pip
 
-# Edit .env with your API key
+# Copy and edit config file
 cp .env.example .env
-# Edit .env: LLM_API_KEY=your-key-here
+# Set in .env: LLM_API_KEY=your-api-key-here
 ```
 
-### 2. Convert a Single MCP Server
+**Supported LLM Providers**: OpenAI, Azure OpenAI, DeepSeek, local models (Ollama/LM Studio), any OpenAI-compatible API.
 
-```bash
-# Create MCP config
-cat > github.json << 'EOF'
+> 💡 **Skip AI Enhancement**: If you don't want to configure LLM, add `--no-ai` flag to conversion commands.
+
+### 2️⃣ Convert a Single MCP Server
+
+Here's an example using the GitHub server:
+
+**Step 1: Create MCP config file**
+
+Create `github.json` file (Windows users can use Notepad):
+
+```json
 {
   "name": "github",
   "command": "npx",
   "args": ["-y", "@modelcontextprotocol/server-github"],
-  "env": {"GITHUB_TOKEN": "ghp_your_token"}
+  "env": {
+    "GITHUB_TOKEN": "ghp_your_actual_token_here"
+  }
 }
-EOF
+```
 
-# Convert to Skill
+**Step 2: Run conversion**
+
+```bash
+# uv users
+uv run mcp2skills convert github.json -o ./skills/github
+
+# pip users
 mcp2skills convert github.json -o ./skills/github
+```
 
-# Install to Claude
+**Step 3: Install to Claude**
+
+```bash
+# Windows (PowerShell)
+Copy-Item -Recurse -Force ./skills/github $env:USERPROFILE\.claude\skills\
+
+# macOS/Linux
 cp -r ./skills/github ~/.claude/skills/
 ```
 
-### 3. Batch Convert Multiple Servers
+Done! Restart Claude Desktop to use the skill.
+
+### 3️⃣ Batch Convert Multiple Servers
+
+If you use Roocode, Claude Code, or Kilocode and already have `mcpservers.json`:
 
 ```bash
-# Prepare mcpservers.json (standard format from Roocode/Claude Code/Kilocode)
-# Then run batch conversion
+# uv users
+uv run mcp2skills batch
+
+# pip users
 mcp2skills batch
 
-# Or specify paths
-mcp2skills batch -c mcpservers.json -o ./skills
+# Custom paths
+uv run mcp2skills batch -c path/to/mcpservers.json -o ./my-skills
 ```
+
+This automatically converts all MCP servers in the config file.
 
 ## Configuration
 
@@ -140,8 +203,8 @@ For MCP servers that require persistent connections (e.g., browser automation to
     "chrome-devtools": {
       "command": "npx",
       "args": ["chrome-devtools-mcp@latest"],
-      "daemon": true,          // Enable daemon mode
-      "daemon_timeout": 3600   // Auto-shutdown after 1 hour of inactivity (optional)
+      "daemon": true, // Enable daemon mode
+      "daemon_timeout": 3600 // Auto-shutdown after 1 hour of inactivity (optional)
     }
   }
 }
@@ -163,12 +226,12 @@ When daemon mode is enabled, MCP2Skills generates:
 
 ### Benefits of Daemon Mode
 
-| Aspect | Standard Mode | Daemon Mode |
-|--------|---------------|-------------|
-| Connection | New per call (~2-5s) | Persistent (<100ms) |
-| Memory | On-demand | Resident process |
-| Best For | Simple tools | Stateful operations |
-| State | Lost between calls | Preserved across calls |
+| Aspect     | Standard Mode        | Daemon Mode            |
+| ---------- | -------------------- | ---------------------- |
+| Connection | New per call (~2-5s) | Persistent (<100ms)    |
+| Memory     | On-demand            | Resident process       |
+| Best For   | Simple tools         | Stateful operations    |
+| State      | Lost between calls   | Preserved across calls |
 
 ### Daemon Management
 
@@ -199,6 +262,7 @@ The `mcpservers.json` file uses the standard MCP server configuration format com
 MCP2Skills supports all three official MCP transport types:
 
 #### 1. stdio (Local Process)
+
 ```json
 {
   "mcpServers": {
@@ -215,6 +279,7 @@ MCP2Skills supports all three official MCP transport types:
 ```
 
 #### 2. SSE (Server-Sent Events)
+
 ```json
 {
   "mcpServers": {
@@ -230,6 +295,7 @@ MCP2Skills supports all three official MCP transport types:
 ```
 
 #### 3. streamable-http (Recommended for Production)
+
 ```json
 {
   "mcpServers": {
@@ -258,11 +324,11 @@ For skills with many tools (>10), MCP2Skills automatically enables **compact mod
 
 ### Benefits
 
-| Metric | Before | After | Improvement |
-|--------|--------|-------|-------------|
-| SKILL.md size | ~11KB | ~4.4KB | **-60%** |
-| SKILL.md lines | 288 | 118 | **-59%** |
-| Context usage | ~3.7k tokens | ~1.5k tokens | **-59%** |
+| Metric         | Before       | After        | Improvement |
+| -------------- | ------------ | ------------ | ----------- |
+| SKILL.md size  | ~11KB        | ~4.4KB       | **-60%**    |
+| SKILL.md lines | 288          | 118          | **-59%**    |
+| Context usage  | ~3.7k tokens | ~1.5k tokens | **-59%**    |
 
 ### Usage
 
@@ -286,21 +352,65 @@ python executor.py --describe <tool_name>
 2. **SKILL.md** (<5k tokens): Loaded when skill triggers - tool overview
 3. **references/tools.md**: Loaded on demand - detailed parameters
 
-## CLI Commands
+## CLI Command Reference
+
+### Basic Commands
 
 ```bash
 # Show help
-mcp2skills --help
+uv run mcp2skills --help        # uv users
+mcp2skills --help               # pip users
 
-# Convert single server
-mcp2skills convert <config.json> [-o output_dir] [--no-ai] [--compact]
-
-# Batch convert
-mcp2skills batch [-c mcpservers.json] [-o skills/] [--skip-split] [--no-ai] [--compact]
-
-# Generate .env template
-mcp2skills init [-o .env.example]
+# Show version
+uv run mcp2skills --version
 ```
+
+### Conversion Commands
+
+```bash
+# Convert a single MCP server
+uv run mcp2skills convert <config.json> [options]
+
+Options:
+  -o, --output DIR     Output directory (default: ./skills/<name>)
+  --no-ai              Disable AI enhancement (no LLM config needed)
+  --compact            Force enable compact mode (auto-enabled for >10 tools)
+
+Examples:
+  uv run mcp2skills convert github.json
+  uv run mcp2skills convert github.json -o ./my-skills --no-ai
+```
+
+```bash
+# Batch convert multiple servers
+uv run mcp2skills batch [options]
+
+Options:
+  -c, --config FILE    MCP config file (default: mcpservers.json)
+  -o, --output DIR     Output root directory (default: ./skills)
+  --skip-split         Don't split config, use original file
+  --no-ai              Disable AI enhancement
+  --compact            Enable compact mode for all skills
+
+Examples:
+  uv run mcp2skills batch
+  uv run mcp2skills batch -c my-servers.json -o ./output
+  uv run mcp2skills batch --no-ai --compact
+```
+
+```bash
+# Generate config template
+uv run mcp2skills init [options]
+
+Options:
+  -o, --output FILE    Output file path (default: .env.example)
+
+Examples:
+  uv run mcp2skills init
+  uv run mcp2skills init -o .env
+```
+
+> 💡 **Tip**: If using pip installation, remove `uv run` prefix from all commands.
 
 ## How It Works
 
@@ -333,10 +443,10 @@ mcp2skills init [-o .env.example]
 
 ## Context Savings
 
-| Mode | Idle | Active | Savings |
-|------|------|--------|---------|
-| MCP (20 tools) | ~30k tokens | ~30k tokens | - |
-| Skills | ~100 tokens | ~5k tokens | 83-99% |
+| Mode           | Idle        | Active      | Savings |
+| -------------- | ----------- | ----------- | ------- |
+| MCP (20 tools) | ~30k tokens | ~30k tokens | -       |
+| Skills         | ~100 tokens | ~5k tokens  | 83-99%  |
 
 ## Project Structure
 
@@ -391,7 +501,5 @@ Based on and inspired by:
 - [mcp-to-skill-converter](https://github.com/GBSOSS/-mcp-to-skill-converter) - Initial converter concept
 - [playwright-skill](https://github.com/lackeyjb/playwright-skill) - Progressive disclosure pattern
 - [Anthropic Skills](https://github.com/anthropics/skills) - Official skill guidelines
-
-## License
 
 MIT License - See LICENSE file for details
