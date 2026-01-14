@@ -351,8 +351,9 @@ class MCPToSkillConverter:
         self, server_name: str, output_dir: Path, is_daemon: bool = False
     ) -> None:
         """Generate package.json file."""
+        skill_name = f"{self.settings.skill_prefix}{server_name}"
         package = {
-            "name": f"skill-{server_name}",
+            "name": skill_name,
             "version": "1.0.0",
             "description": f"Claude Skill for {server_name} MCP server",
             "mode": "daemon" if is_daemon else "standard",
