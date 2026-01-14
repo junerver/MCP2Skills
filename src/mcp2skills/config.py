@@ -41,7 +41,7 @@ class Settings(BaseModel):
     # Generation options
     use_ai: bool = Field(default=True, description="Use AI to enhance skill generation")
     skill_prefix: str = Field(
-        default="skill-", description="Prefix for generated skill directories"
+        default="", description="Prefix for generated skill directories"
     )
     compact_mode: bool | None = Field(
         default=None,
@@ -70,7 +70,7 @@ class Settings(BaseModel):
             servers_dir=Path(os.getenv("SERVERS_DIR", "servers")),
             output_dir=Path(os.getenv("OUTPUT_DIR", "skills")),
             use_ai=os.getenv("USE_AI", "true").lower() in ("true", "1", "yes"),
-            skill_prefix=os.getenv("SKILL_PREFIX", "skill-"),
+            skill_prefix=os.getenv("SKILL_PREFIX", ""),
         )
 
     def validate_llm_config(self) -> bool:
